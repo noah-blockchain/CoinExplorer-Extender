@@ -14,6 +14,7 @@ func main() {
 
 	extenderApi := api.New(envData.ApiHost, envData.ApiPort)
 	go extenderApi.Run()
+
 	ext := core.NewExtender(envData)
 	ext.Run()
 }

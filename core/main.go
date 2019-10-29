@@ -25,8 +25,8 @@ import (
 
 const ChasingModDiff = 2
 
-//const fallbackCount = 5
-//const fallbackTimeout = 5 * time.Second
+const fallbackCount = 10
+const fallbackTimeout = 15 * time.Second
 
 type Extender struct {
 	env                 *models.ExtenderEnvironment
@@ -74,7 +74,7 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 
 	contextLogger := logger.WithFields(logrus.Fields{
 		"version": "2.1.0",
-		"app":     "Noah Explorer Extender",
+		"app":     "Coin Explorer Extender",
 	})
 
 	//Init DB
@@ -93,8 +93,7 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 		db.AddQueryHook(dbLogger{logger: contextLogger})
 	}
 	//api
-	//nodeApi := noah_node_go_api.NewWithFallbackRetries(env.NodeApi, fallbackCount, fallbackTimeout)
-	nodeApi := noah_node_go_api.New(env.NodeApi)
+	nodeApi := noah_node_go_api.NewWithFallbackRetries(env.NodeApi, fallbackCount, fallbackTimeout)
 
 	// Repositories
 	blockRepository := block.NewRepository(db)

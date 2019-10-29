@@ -89,18 +89,27 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		DeletedAt:      nil,
 	}
 
-	fromId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.From))
-	if err != nil {
-		s.logger.Error(err)
-	} else {
-		coin.CreationAddressID = &fromId
+	repeatTime := 10
+	for i := 0; i < repeatTime; i++ {
+		fromId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.From))
+		if err != nil {
+			s.logger.Error(err)
+			time.Sleep(2 * time.Second)
+			continue
+		} else {
+			coin.CreationAddressID = &fromId
+		}
 	}
 
-	fromTxId, err := s.repository.FindTransactionIdByHash(tx.Hash)
-	if err != nil {
-		s.logger.Error(err)
-	} else {
-		coin.CreationTransactionID = &fromTxId
+	for i := 0; i < repeatTime; i++ {
+		fromTxId, err := s.repository.FindTransactionIdByHash(helpers.RemovePrefix(tx.Hash))
+		if err != nil {
+			s.logger.Print(err)
+			time.Sleep(2 * time.Second)
+			continue
+		} else {
+			coin.CreationTransactionID = &fromTxId
+		}
 	}
 
 	return coin, nil
