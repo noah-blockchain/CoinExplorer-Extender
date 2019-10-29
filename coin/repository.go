@@ -96,3 +96,12 @@ func (r Repository) DeleteBySymbol(symbol string) error {
 	_, err := r.db.Model(coin).Where("symbol = ?symbol").Delete()
 	return err
 }
+
+func (r *Repository) FindTransactionIdByHash(hash string) (uint64, error) {
+	tx := new(models.Transaction)
+	err := r.db.Model(tx).Column("id").Where("hash = ?", hash).Select(tx)
+	if err != nil {
+		return 0, err
+	}
+	return tx.ID, nil
+}

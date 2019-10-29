@@ -86,3 +86,13 @@ ON CONFLICT DO NOTHING;
 	`, txsNumber, txsNumber)
 	return err
 }
+
+////Find tx id
+//func (r *Repository) FindIdByHash(hash string) (uint64, error) {
+//	tx := new(models.Transaction)
+//	err := r.db.Model(tx).Column("id").Where("hash = ?", hash).Select(tx)
+//	if err != nil {
+//		return 0, err
+//	}
+//	return tx.ID, nil
+//}

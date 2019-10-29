@@ -1,4 +1,4 @@
-module github.com/noah-blockchain/noah-explorer-extender
+module github.com/noah-blockchain/CoinExplorer-Extender
 
 go 1.12
 

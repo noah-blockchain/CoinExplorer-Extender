@@ -1527,6 +1527,8 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 
 INSERT INTO public.coins (symbol)
 VALUES ('NOAH');
+
+-- REINDEX INDEX transactions_hash_index;
 `
 
 func init() {

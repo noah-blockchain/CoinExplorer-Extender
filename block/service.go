@@ -1,8 +1,8 @@
 package block
 
 import (
-	"github.com/noah-blockchain/noah-explorer-extender/broadcast"
-	"github.com/noah-blockchain/noah-explorer-extender/validator"
+	"github.com/noah-blockchain/CoinExplorer-Extender/broadcast"
+	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
 	"github.com/noah-blockchain/noah-explorer-tools/helpers"
 	"github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api/responses"

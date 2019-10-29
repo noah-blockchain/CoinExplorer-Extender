@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/go-pg/pg"
-	"github.com/noah-blockchain/noah-explorer-extender/address"
-	"github.com/noah-blockchain/noah-explorer-extender/balance"
-	"github.com/noah-blockchain/noah-explorer-extender/block"
-	"github.com/noah-blockchain/noah-explorer-extender/broadcast"
-	"github.com/noah-blockchain/noah-explorer-extender/coin"
-	"github.com/noah-blockchain/noah-explorer-extender/events"
-	"github.com/noah-blockchain/noah-explorer-extender/transaction"
-	"github.com/noah-blockchain/noah-explorer-extender/validator"
+	"github.com/noah-blockchain/CoinExplorer-Extender/address"
+	"github.com/noah-blockchain/CoinExplorer-Extender/balance"
+	"github.com/noah-blockchain/CoinExplorer-Extender/block"
+	"github.com/noah-blockchain/CoinExplorer-Extender/broadcast"
+	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
+	"github.com/noah-blockchain/CoinExplorer-Extender/events"
+	"github.com/noah-blockchain/CoinExplorer-Extender/transaction"
+	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
 	"github.com/noah-blockchain/noah-explorer-tools/helpers"
 	"github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
@@ -170,9 +170,9 @@ func (ext *Extender) Run() {
 		}
 		helpers.HandleError(err)
 
-		ext.handleCoinsFromTransactions(blockResponse.Result.Transactions)
 		ext.handleAddressesFromResponses(blockResponse, eventsResponse)
 		ext.handleBlockResponse(blockResponse)
+		ext.handleCoinsFromTransactions(blockResponse.Result.Transactions)
 
 		if height%uint64(ext.env.RewardAggregateEveryBlocksCount) == 0 {
 			go ext.eventService.AggregateRewards(ext.env.RewardAggregateTimeInterval, height)

@@ -2,14 +2,15 @@ package coin
 
 import (
 	"errors"
-	"github.com/noah-blockchain/noah-explorer-extender/address"
+	"strconv"
+	"time"
+
+	"github.com/noah-blockchain/CoinExplorer-Extender/address"
 	"github.com/noah-blockchain/noah-explorer-tools/helpers"
 	"github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
-	"strconv"
-	"time"
 )
 
 type Service struct {
@@ -93,6 +94,13 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		s.logger.Error(err)
 	} else {
 		coin.CreationAddressID = &fromId
+	}
+
+	fromTxId, err := s.repository.FindTransactionIdByHash(tx.Hash)
+	if err != nil {
+		s.logger.Error(err)
+	} else {
+		coin.CreationTransactionID = &fromTxId
 	}
 
 	return coin, nil
