@@ -94,7 +94,7 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		fromId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.From))
 		if err != nil {
 			s.logger.Error(err)
-			time.Sleep(2 * time.Second)
+			time.Sleep(3 * time.Second)
 			continue
 		} else {
 			coin.CreationAddressID = &fromId
@@ -105,7 +105,7 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		fromTxId, err := s.repository.FindTransactionIdByHash(helpers.RemovePrefix(tx.Hash))
 		if err != nil {
 			s.logger.Print(err)
-			time.Sleep(2 * time.Second)
+			time.Sleep(3 * time.Second)
 			continue
 		} else {
 			coin.CreationTransactionID = &fromTxId
