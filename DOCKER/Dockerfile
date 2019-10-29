@@ -14,6 +14,6 @@ RUN make create_vendor && \
     make build && \
     cp ./builds/coin_extender /usr/local/bin/coin_extender
 
-EXPOSE 9000
+EXPOSE 10000
 CMD ["coin_extender"]
 STOPSIGNAL SIGTERM
