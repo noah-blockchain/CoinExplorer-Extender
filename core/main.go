@@ -11,7 +11,6 @@ import (
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
 	"github.com/noah-blockchain/CoinExplorer-Extender/balance"
 	"github.com/noah-blockchain/CoinExplorer-Extender/block"
-	"github.com/noah-blockchain/CoinExplorer-Extender/broadcast"
 	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
 	"github.com/noah-blockchain/CoinExplorer-Extender/events"
 	"github.com/noah-blockchain/CoinExplorer-Extender/transaction"
@@ -105,18 +104,17 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 	balanceRepository := balance.NewRepository(db)
 
 	// Services
-	broadcastService := broadcast.NewService(env, addressRepository, coinRepository, contextLogger)
 	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger)
-	balanceService := balance.NewService(env, balanceRepository, nodeApi, addressRepository, coinRepository, broadcastService, contextLogger)
+	balanceService := balance.NewService(env, balanceRepository, nodeApi, addressRepository, coinRepository, contextLogger)
 
 	return &Extender{
 		env:                 env,
 		nodeApi:             nodeApi,
-		blockService:        block.NewBlockService(blockRepository, validatorRepository, broadcastService),
+		blockService:        block.NewBlockService(blockRepository, validatorRepository),
 		eventService:        events.NewService(env, eventsRepository, validatorRepository, addressRepository, coinRepository, coinService, balanceRepository, contextLogger),
 		blockRepository:     blockRepository,
 		validatorService:    validator.NewService(env, nodeApi, validatorRepository, addressRepository, coinRepository, contextLogger),
-		transactionService:  transaction.NewService(env, transactionRepository, addressRepository, validatorRepository, coinRepository, coinService, broadcastService, contextLogger),
+		transactionService:  transaction.NewService(env, transactionRepository, addressRepository, validatorRepository, coinRepository, coinService, contextLogger),
 		addressService:      address.NewService(env, addressRepository, balanceService.GetAddressesChannel(), contextLogger),
 		validatorRepository: validatorRepository,
 		balanceService:      balanceService,
@@ -150,6 +148,8 @@ func (ext *Extender) Run() {
 	} else {
 		height = 1
 	}
+
+	height = 406276
 
 	for {
 		start := time.Now()

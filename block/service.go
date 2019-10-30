@@ -1,7 +1,6 @@
 package block
 
 import (
-	"github.com/noah-blockchain/CoinExplorer-Extender/broadcast"
 	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
@@ -13,15 +12,13 @@ import (
 type Service struct {
 	blockRepository     *Repository
 	validatorRepository *validator.Repository
-	broadcastService    *broadcast.Service
 	blockCache          *models.Block //Contain previous block model
 }
 
-func NewBlockService(blockRepository *Repository, validatorRepository *validator.Repository, broadcastService *broadcast.Service) *Service {
+func NewBlockService(blockRepository *Repository, validatorRepository *validator.Repository) *Service {
 	return &Service{
 		blockRepository:     blockRepository,
 		validatorRepository: validatorRepository,
-		broadcastService:    broadcastService,
 	}
 }
 
@@ -64,8 +61,6 @@ func (s *Service) HandleBlockResponse(response *responses.BlockResponse) error {
 		Hash:                response.Result.Hash,
 	}
 	s.SetBlockCache(block)
-
-	go s.broadcastService.PublishBlock(block)
 
 	return s.blockRepository.Save(block)
 }

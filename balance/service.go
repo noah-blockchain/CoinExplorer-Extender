@@ -2,7 +2,6 @@ package balance
 
 import (
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
-	"github.com/noah-blockchain/CoinExplorer-Extender/broadcast"
 	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
@@ -19,7 +18,6 @@ type Service struct {
 	repository             *Repository
 	addressRepository      *address.Repository
 	coinRepository         *coin.Repository
-	broadcastService       *broadcast.Service
 	jobGetBalancesFromNode chan models.BlockAddresses
 	jobUpdateBalance       chan AddressesBalancesContainer
 	chAddresses            chan models.BlockAddresses
@@ -35,19 +33,16 @@ type AddressesBalancesContainer struct {
 	addressRepository *address.Repository
 	coinRepository    *coin.Repository
 	chAddresses       chan models.BlockAddresses
-	broadcastService  *broadcast.Service
 }
 
 func NewService(env *models.ExtenderEnvironment, repository *Repository, nodeApi *noah_node_go_api.NoahNodeApi,
-	addressRepository *address.Repository, coinRepository *coin.Repository, broadcastService *broadcast.Service,
-	logger *logrus.Entry) *Service {
+	addressRepository *address.Repository, coinRepository *coin.Repository, logger *logrus.Entry) *Service {
 	return &Service{
 		env:                    env,
 		repository:             repository,
 		nodeApi:                nodeApi,
 		addressRepository:      addressRepository,
 		coinRepository:         coinRepository,
-		broadcastService:       broadcastService,
 		chAddresses:            make(chan models.BlockAddresses),
 		jobUpdateBalance:       make(chan AddressesBalancesContainer, env.WrkUpdateBalanceCount),
 		jobGetBalancesFromNode: make(chan models.BlockAddresses, env.WrkGetBalancesFromNodeCount),
@@ -105,7 +100,6 @@ func (s *Service) GetBalancesFromNodeWorker(jobs <-chan models.BlockAddresses, r
 			s.logger.Error(err)
 		} else {
 			result <- AddressesBalancesContainer{Addresses: blockAddresses.Addresses, Balances: balances}
-			go s.broadcastService.PublishBalances(balances)
 		}
 	}
 }

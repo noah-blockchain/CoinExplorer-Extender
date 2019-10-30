@@ -5,8 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
+	"strconv"
+	"time"
+
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
-	"github.com/noah-blockchain/CoinExplorer-Extender/broadcast"
 	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
 	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
@@ -14,9 +17,6 @@ import (
 	"github.com/noah-blockchain/noah-go-node/core/check"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
-	"math"
-	"strconv"
-	"time"
 )
 
 type Service struct {
@@ -26,7 +26,6 @@ type Service struct {
 	validatorRepository *validator.Repository
 	coinRepository      *coin.Repository
 	coinService         *coin.Service
-	broadcastService    *broadcast.Service
 	jobSaveTxs          chan []*models.Transaction
 	jobSaveTxsOutput    chan []*models.Transaction
 	jobSaveValidatorTxs chan []*models.TransactionValidator
@@ -35,8 +34,7 @@ type Service struct {
 }
 
 func NewService(env *models.ExtenderEnvironment, repository *Repository, addressRepository *address.Repository,
-	validatorRepository *validator.Repository, coinRepository *coin.Repository, coinService *coin.Service,
-	broadcastService *broadcast.Service, logger *logrus.Entry) *Service {
+	validatorRepository *validator.Repository, coinRepository *coin.Repository, coinService *coin.Service, logger *logrus.Entry) *Service {
 	return &Service{
 		env:                 env,
 		txRepository:        repository,
@@ -44,7 +42,6 @@ func NewService(env *models.ExtenderEnvironment, repository *Repository, address
 		addressRepository:   addressRepository,
 		coinService:         coinService,
 		validatorRepository: validatorRepository,
-		broadcastService:    broadcastService,
 		jobSaveTxs:          make(chan []*models.Transaction, env.WrkSaveTxsCount),
 		jobSaveTxsOutput:    make(chan []*models.Transaction, env.WrkSaveTxsOutputCount),
 		jobSaveValidatorTxs: make(chan []*models.TransactionValidator, env.WrkSaveValidatorTxsCount),
@@ -126,13 +123,6 @@ func (s *Service) SaveTransactionsWorker(jobs <-chan []*models.Transaction) {
 		}
 
 		s.GetSaveTxsOutputJobChannel() <- transactions
-
-		//no need to publish a big number of transaction
-		if len(transactions) > 10 {
-			go s.broadcastService.PublishTransactions(transactions[:10])
-		} else {
-			go s.broadcastService.PublishTransactions(transactions)
-		}
 	}
 }
 func (s *Service) SaveTransactionsOutputWorker(jobs <-chan []*models.Transaction) {
