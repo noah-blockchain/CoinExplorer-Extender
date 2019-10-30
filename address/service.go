@@ -3,8 +3,8 @@ package address
 import (
 	"encoding/base64"
 	"errors"
-	"github.com/noah-blockchain/noah-explorer-tools/helpers"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-go-node/core/check"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"

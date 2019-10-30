@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/go-pg/pg"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 )
 
 type Repository struct {
@@ -104,4 +104,24 @@ func (r *Repository) FindTransactionIdByHash(hash string) (uint64, error) {
 		return 0, err
 	}
 	return tx.ID, nil
+}
+
+
+func (r *Repository) UpdateCoinOwner(symbol string, creationAddressID uint64) error {
+	coin := models.Coin{CreationAddressID: &creationAddressID}
+	_, err := r.db.Model(&coin).Column("creation_address_id").Where("symbol = ?", symbol).Update()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+
+func (r *Repository) UpdateCoinTransaction(symbol string, creationTransactionID uint64) error {
+	coin := models.Coin{CreationTransactionID: &creationTransactionID}
+	_, err := r.db.Model(&coin).Column("creation_transaction_id").Where("symbol = ?", symbol).Update()
+	if err != nil {
+		return err
+	}
+	return nil
 }

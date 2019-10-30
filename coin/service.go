@@ -6,11 +6,16 @@ import (
 	"time"
 
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
-	"github.com/noah-blockchain/noah-explorer-tools/helpers"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	updaterWorkerAddressTimeout     = 2 * time.Second
+	updaterWorkerTransactionTimeout = 3 * time.Second
 )
 
 type Service struct {
@@ -21,6 +26,7 @@ type Service struct {
 	logger                *logrus.Entry
 	jobUpdateCoins        chan []*models.Transaction
 	jobUpdateCoinsFromMap chan map[string]struct{}
+	//updater               *sync.Map
 }
 
 func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
@@ -33,6 +39,7 @@ func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahN
 		logger:                logger,
 		jobUpdateCoins:        make(chan []*models.Transaction, 1),
 		jobUpdateCoinsFromMap: make(chan map[string]struct{}, 1),
+		//updater:               new(sync.Map),
 	}
 }
 
@@ -87,32 +94,81 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		Name:           txData.Name,
 		Symbol:         txData.Symbol,
 		DeletedAt:      nil,
+		Price:          getTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
+		Delegated:      0,
 	}
 
-	repeatTime := 10
-	for i := 0; i < repeatTime; i++ {
-		fromId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.From))
-		if err != nil {
-			s.logger.Error(err)
-			time.Sleep(3 * time.Second)
-			continue
-		} else {
-			coin.CreationAddressID = &fromId
-		}
-	}
+	//repeatTime := 10
+	//for i := 0; i < repeatTime; i++ {
+	//	fromId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.From))
+	//	if err != nil {
+	//		s.logger.Error(err)
+	//		time.Sleep(5 * time.Second)
+	//		continue
+	//	} else {
+	//		coin.CreationAddressID = &fromId
+	//	}
+	//}
+	//
+	//for i := 0; i < repeatTime; i++ {
+	//	fromTxId, err := s.repository.FindTransactionIdByHash(helpers.RemovePrefix(tx.Hash))
+	//	if err != nil {
+	//		s.logger.Print(err)
+	//		time.Sleep(5 * time.Second)
+	//		continue
+	//	} else {
+	//		coin.CreationTransactionID = &fromTxId
+	//	}
+	//}
 
-	for i := 0; i < repeatTime; i++ {
-		fromTxId, err := s.repository.FindTransactionIdByHash(helpers.RemovePrefix(tx.Hash))
-		if err != nil {
-			s.logger.Print(err)
-			time.Sleep(3 * time.Second)
-			continue
-		} else {
-			coin.CreationTransactionID = &fromTxId
-		}
-	}
+	go s.updateCoinAddressInfo(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
+	go s.updateCoinTransactionInfo(coin.Symbol, helpers.RemovePrefix(tx.Hash))
 
 	return coin, nil
+}
+
+func (s *Service) updateCoinAddressInfo(symbol string, address string) {
+	ticker := time.NewTicker(updaterWorkerAddressTimeout)
+
+	for { // nolint:gosimple
+		select {
+		case <-ticker.C:
+			fromId, err := s.addressRepository.FindId(address)
+			if err != nil {
+				s.logger.Error(err)
+			} else {
+				s.logger.Error("updateCoinAddressInfo fromId: ", fromId)
+				if err = s.repository.UpdateCoinOwner(symbol, fromId); err == nil {
+					s.logger.Error("updateCoinAddressInfo Stop")
+					ticker.Stop()
+					break
+				}
+				s.logger.Error("updateCoinAddressInfo ERROR: ", err)
+			}
+		}
+	}
+}
+
+func (s *Service) updateCoinTransactionInfo(symbol string, hash string) {
+	ticker := time.NewTicker(updaterWorkerTransactionTimeout)
+
+	for { // nolint:gosimple
+		select {
+		case <-ticker.C:
+			fromTxId, err := s.repository.FindTransactionIdByHash(hash)
+			if err != nil {
+				s.logger.Error(err)
+			} else {
+				s.logger.Error("updateCoinTransactionInfo fromTxId: ", fromTxId)
+				if err = s.repository.UpdateCoinTransaction(symbol, fromTxId); err == nil {
+					s.logger.Error("updateCoinTransactionInfo Stop")
+					ticker.Stop()
+					break
+				}
+				s.logger.Error("updateCoinTransactionInfo ERROR: ", err)
+			}
+		}
+	}
 }
 
 func (s *Service) CreateNewCoins(coins []*models.Coin) error {
@@ -216,5 +272,8 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.Volume = coinResp.Result.Volume
 	coin.DeletedAt = nil
 	coin.UpdatedAt = now
+	coin.Delegated = 0
+	coin.Price = getTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
+
 	return coin, nil
 }

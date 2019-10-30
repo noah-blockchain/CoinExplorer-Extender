@@ -4,7 +4,7 @@ import (
 	"flag"
 	"os"
 
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 )
 
 func New() *models.ExtenderEnvironment {

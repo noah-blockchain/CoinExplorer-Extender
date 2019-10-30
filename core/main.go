@@ -16,8 +16,8 @@ import (
 	"github.com/noah-blockchain/CoinExplorer-Extender/events"
 	"github.com/noah-blockchain/CoinExplorer-Extender/transaction"
 	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
-	"github.com/noah-blockchain/noah-explorer-tools/helpers"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
@@ -151,6 +151,8 @@ func (ext *Extender) Run() {
 		height = 1
 	}
 
+	height = 404681
+
 	for {
 		start := time.Now()
 		ext.findOutChasingMode(height)
@@ -208,7 +210,9 @@ func (ext *Extender) runWorkers() {
 	for w := 1; w <= ext.env.WrkSaveValidatorTxsCount; w++ {
 		go ext.transactionService.SaveTxValidatorWorker(ext.transactionService.GetSaveTxValidatorJobChannel())
 	}
+	//обновляет награды валидаторов
 	go ext.validatorService.UpdateValidatorsWorker(ext.validatorService.GetUpdateValidatorsJobChannel())
+	//обновляет награды валидаторов
 	go ext.validatorService.UpdateStakesWorker(ext.validatorService.GetUpdateStakesJobChannel())
 
 	// Events

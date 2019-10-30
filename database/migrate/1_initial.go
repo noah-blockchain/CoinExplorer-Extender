@@ -252,6 +252,8 @@ CREATE TABLE public.coins
     crr                     integer,
     volume                  numeric(70, 0),
     reserve_balance         numeric(70, 0),
+    price                   numeric(100, 0)          default 0.0,
+    delegated               integer                  default 0,
     name                    character varying(255),
     symbol                  character varying(20)                  NOT NULL,
     updated_at              timestamp with time zone DEFAULT now() NOT NULL,

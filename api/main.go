@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/noah-blockchain/noah-explorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"strconv"
