@@ -27,7 +27,6 @@ type Service struct {
 	logger                *logrus.Entry
 	jobUpdateCoins        chan []*models.Transaction
 	jobUpdateCoinsFromMap chan map[string]struct{}
-	//updater               *sync.Map
 }
 
 func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
@@ -40,7 +39,6 @@ func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahN
 		logger:                logger,
 		jobUpdateCoins:        make(chan []*models.Transaction, 1),
 		jobUpdateCoinsFromMap: make(chan map[string]struct{}, 1),
-		//updater:               new(sync.Map),
 	}
 }
 
@@ -98,29 +96,6 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		Price:          getTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
 		Delegated:      0,
 	}
-
-	//repeatTime := 10
-	//for i := 0; i < repeatTime; i++ {
-	//	fromId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.From))
-	//	if err != nil {
-	//		s.logger.Error(err)
-	//		time.Sleep(5 * time.Second)
-	//		continue
-	//	} else {
-	//		coin.CreationAddressID = &fromId
-	//	}
-	//}
-	//
-	//for i := 0; i < repeatTime; i++ {
-	//	fromTxId, err := s.repository.FindTransactionIdByHash(helpers.RemovePrefix(tx.Hash))
-	//	if err != nil {
-	//		s.logger.Print(err)
-	//		time.Sleep(5 * time.Second)
-	//		continue
-	//	} else {
-	//		coin.CreationTransactionID = &fromTxId
-	//	}
-	//}
 
 	go s.updateCoinAddressInfo(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
 	go s.updateCoinTransactionInfo(coin.Symbol, helpers.RemovePrefix(tx.Hash))
