@@ -168,14 +168,14 @@ func (s *Service) UpdateCoinsInfoFromTxsWorker(jobs <-chan []*models.Transaction
 			coinsMap[symbol] = struct{}{}
 			switch tx.Type {
 			case models.TxTypeSellCoin:
-				coinsMap[tx.IData.(models.SellCoinTxData).CoinToBuy] = struct{}{}
-				coinsMap[tx.IData.(models.SellCoinTxData).CoinToSell] = struct{}{}
+				coinsMap[tx.IData.(node_models.SellCoinTxData).CoinToBuy] = struct{}{}
+				coinsMap[tx.IData.(node_models.SellCoinTxData).CoinToSell] = struct{}{}
 			case models.TxTypeBuyCoin:
-				coinsMap[tx.IData.(models.BuyCoinTxData).CoinToBuy] = struct{}{}
-				coinsMap[tx.IData.(models.BuyCoinTxData).CoinToSell] = struct{}{}
+				coinsMap[tx.IData.(node_models.BuyCoinTxData).CoinToBuy] = struct{}{}
+				coinsMap[tx.IData.(node_models.BuyCoinTxData).CoinToSell] = struct{}{}
 			case models.TxTypeSellAllCoin:
-				coinsMap[tx.IData.(models.SellAllCoinTxData).CoinToBuy] = struct{}{}
-				coinsMap[tx.IData.(models.SellAllCoinTxData).CoinToSell] = struct{}{}
+				coinsMap[tx.IData.(node_models.SellAllCoinTxData).CoinToBuy] = struct{}{}
+				coinsMap[tx.IData.(node_models.SellAllCoinTxData).CoinToSell] = struct{}{}
 			}
 		}
 		s.GetUpdateCoinsFromCoinsMapJobChannel() <- coinsMap
