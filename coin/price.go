@@ -25,20 +25,30 @@ func convertStringToBigInt(value string) (*big.Int, error) {
 	return newValue, nil
 }
 
+func NoahToQNoah(noah *big.Float) *big.Int {
+	p := big.NewInt(10)
+	p.Exp(p, big.NewInt(18), nil)
+	noah.Mul(noah, new(big.Float).SetInt(p))
+	res, _ := noah.Int(nil)
+	return res
+}
+
 //reserve * (math.pow(1 + 1 / volume, 100 / crr) - 1)
 func calculatePurchaseAmount(supply *big.Int, reserve *big.Int, crr uint, wantReceive *big.Int) *big.Int {
-	if wantReceive.Cmp(types.Big0) == 0 || supply == nil || reserve == nil || supply.Cmp(types.Big0) == 0{
+	if wantReceive.Cmp(types.Big0) == 0 || supply == nil || reserve == nil || supply.Cmp(types.Big0) == 0 {
 		return big.NewInt(0)
-	}
-
-	if crr == 100 {
-		result := big.NewInt(0).Mul(wantReceive, reserve)
-		return result.Div(result, supply)
 	}
 
 	tSupply := newFloat(0).SetInt(supply)
 	tReserve := newFloat(0).SetInt(reserve)
 	tWantReceive := newFloat(0).SetInt(wantReceive)
+
+	if crr == 100 {
+		result := newFloat(float64(wantReceive.Uint64()))
+		result.Mul(result, tReserve)
+		result.Quo(result, tSupply)
+		return NoahToQNoah(result)
+	}
 
 	res := newFloat(0).Add(tWantReceive, tSupply)   // reserve + supply
 	res.Quo(res, tSupply)                           // (reserve + supply) / supply
@@ -46,8 +56,7 @@ func calculatePurchaseAmount(supply *big.Int, reserve *big.Int, crr uint, wantRe
 	res.Sub(res, newFloat(1))                       // (((reserve + supply) / supply)^(100/c) - 1)
 	res.Mul(res, tReserve)                          // reserve * (((reserve + supply) / supply)^(100/c) - 1)
 
-	result, _ := res.Int(nil)
-	return result
+	return NoahToQNoah(res)
 }
 
 func getTokenPrice(volumeStr string, reserveStr string, crr uint64) string {
