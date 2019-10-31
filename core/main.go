@@ -149,6 +149,8 @@ func (ext *Extender) Run() {
 		height = 1
 	}
 
+	height = 9925
+
 	for {
 		start := time.Now()
 		ext.findOutChasingMode(height)

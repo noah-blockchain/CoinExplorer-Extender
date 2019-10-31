@@ -14,6 +14,7 @@ import (
 	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
+	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-go-node/core/check"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
@@ -177,28 +178,28 @@ func (s *Service) SaveAllTxOutputs(txList []*models.Transaction) error {
 
 		idsList = append(idsList, tx.ID)
 
-		if tx.Type != models.TxTypeSend && tx.Type != models.TxTypeMultiSend && tx.Type != models.TxTypeRedeemCheck {
+		if tx.Type != node_models.TxTypeSend && tx.Type != node_models.TxTypeMultiSend && tx.Type != node_models.TxTypeRedeemCheck {
 			continue
 		}
 
-		if tx.Type == models.TxTypeSend {
-			if tx.IData.(models.SendTxData).To == "" {
+		if tx.Type == node_models.TxTypeSend {
+			if tx.IData.(node_models.SendTxData).To == "" {
 				return errors.New("empty receiver of transaction")
 			}
 
-			toId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.IData.(models.SendTxData).To))
+			toId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.IData.(node_models.SendTxData).To))
 			helpers.HandleError(err)
-			coinID, err := s.coinRepository.FindIdBySymbol(tx.IData.(models.SendTxData).Coin)
+			coinID, err := s.coinRepository.FindIdBySymbol(tx.IData.(node_models.SendTxData).Coin)
 			helpers.HandleError(err)
 			list = append(list, &models.TransactionOutput{
 				TransactionID: tx.ID,
 				ToAddressID:   toId,
 				CoinID:        coinID,
-				Value:         tx.IData.(models.SendTxData).Value,
+				Value:         tx.IData.(node_models.SendTxData).Value,
 			})
 		}
-		if tx.Type == models.TxTypeMultiSend {
-			for _, receiver := range tx.IData.(models.MultiSendTxData).List {
+		if tx.Type == node_models.TxTypeMultiSend {
+			for _, receiver := range tx.IData.(node_models.MultiSendTxData).List {
 				toId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(receiver.To))
 				helpers.HandleError(err)
 				coinID, err := s.coinRepository.FindIdBySymbol(receiver.Coin)
@@ -211,8 +212,8 @@ func (s *Service) SaveAllTxOutputs(txList []*models.Transaction) error {
 				})
 			}
 		}
-		if tx.Type == models.TxTypeRedeemCheck {
-			decoded, err := base64.StdEncoding.DecodeString(tx.IData.(models.RedeemCheckTxData).RawCheck)
+		if tx.Type == node_models.TxTypeRedeemCheck {
+			decoded, err := base64.StdEncoding.DecodeString(tx.IData.(node_models.RedeemCheckTxData).RawCheck)
 			if err != nil {
 				s.logger.WithFields(logrus.Fields{
 					"Tx": tx.Hash,
@@ -337,18 +338,18 @@ func (s *Service) getLinksTxValidator(transactions []*models.Transaction) ([]*mo
 		}
 		var validatorPk string
 		switch tx.Type {
-		case models.TxTypeDeclareCandidacy:
-			validatorPk = tx.IData.(models.DeclareCandidacyTxData).PubKey
-		case models.TxTypeDelegate:
-			validatorPk = tx.IData.(models.DelegateTxData).PubKey
-		case models.TxTypeUnbound:
-			validatorPk = tx.IData.(models.UnbondTxData).PubKey
-		case models.TxTypeSetCandidateOnline:
-			validatorPk = tx.IData.(models.SetCandidateTxData).PubKey
-		case models.TxTypeSetCandidateOffline:
-			validatorPk = tx.IData.(models.SetCandidateTxData).PubKey
-		case models.TxTypeEditCandidate:
-			validatorPk = tx.IData.(models.EditCandidateTxData).PubKey
+		case node_models.TxTypeDeclareCandidacy:
+			validatorPk = tx.IData.(node_models.DeclareCandidacyTxData).PubKey
+		case node_models.TxTypeDelegate:
+			validatorPk = tx.IData.(node_models.DelegateTxData).PubKey
+		case node_models.TxTypeUnbound:
+			validatorPk = tx.IData.(node_models.UnbondTxData).PubKey
+		case node_models.TxTypeSetCandidateOnline:
+			validatorPk = tx.IData.(node_models.SetCandidateTxData).PubKey
+		case node_models.TxTypeSetCandidateOffline:
+			validatorPk = tx.IData.(node_models.SetCandidateTxData).PubKey
+		case node_models.TxTypeEditCandidate:
+			validatorPk = tx.IData.(node_models.EditCandidateTxData).PubKey
 		}
 
 		if validatorPk != "" {

@@ -5,6 +5,7 @@ import (
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
+	"math"
 	"strconv"
 	"time"
 )
@@ -49,12 +50,17 @@ func (s *Service) HandleBlockResponse(response *responses.BlockResponse) error {
 		proposerId = 1
 	}
 
+	blockTime := s.getBlockTime(response.Result.Time)
+	if blockTime >= math.MaxInt64 {
+		blockTime = math.MaxInt64 - 1
+	}
+
 	block := &models.Block{
 		ID:                  height,
 		TotalTxs:            totalTx,
 		NumTxs:              uint32(numTx),
 		Size:                size,
-		BlockTime:           s.getBlockTime(response.Result.Time),
+		BlockTime:           blockTime,
 		CreatedAt:           response.Result.Time,
 		BlockReward:         response.Result.BlockReward,
 		ProposerValidatorID: proposerId,

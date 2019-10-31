@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
+	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-go-node/core/check"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
@@ -56,16 +57,16 @@ func (s *Service) ExtractAddressesFromTransactions(transactions []responses.Tran
 			return nil, errors.New("empty transaction data"), nil
 		}
 		mapAddresses[helpers.RemovePrefixFromAddress(tx.From)] = struct{}{}
-		if tx.Type == models.TxTypeSend {
-			mapAddresses[helpers.RemovePrefixFromAddress(tx.IData.(models.SendTxData).To)] = struct{}{}
+		if tx.Type == node_models.TxTypeSend {
+			mapAddresses[helpers.RemovePrefixFromAddress(tx.IData.(node_models.SendTxData).To)] = struct{}{}
 		}
-		if tx.Type == models.TxTypeMultiSend {
-			for _, receiver := range tx.IData.(models.MultiSendTxData).List {
+		if tx.Type == node_models.TxTypeMultiSend {
+			for _, receiver := range tx.IData.(node_models.MultiSendTxData).List {
 				mapAddresses[helpers.RemovePrefixFromAddress(receiver.To)] = struct{}{}
 			}
 		}
-		if tx.Type == models.TxTypeRedeemCheck {
-			decoded, err := base64.StdEncoding.DecodeString(tx.IData.(models.RedeemCheckTxData).RawCheck)
+		if tx.Type == node_models.TxTypeRedeemCheck {
+			decoded, err := base64.StdEncoding.DecodeString(tx.IData.(node_models.RedeemCheckTxData).RawCheck)
 			if err != nil {
 				s.logger.WithFields(logrus.Fields{
 					"Tx": tx.Hash,
