@@ -93,7 +93,7 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		Name:           txData.Name,
 		Symbol:         txData.Symbol,
 		DeletedAt:      nil,
-		Price:          getTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
+		Price:          GetTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
 		Delegated:      0,
 	}
 
@@ -249,7 +249,7 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.DeletedAt = nil
 	coin.UpdatedAt = now
 	coin.Delegated = 0
-	coin.Price = getTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
+	coin.Price = GetTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
 
 	return coin, nil
 }

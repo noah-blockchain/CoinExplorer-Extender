@@ -149,6 +149,8 @@ Icon
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
 
+cmd/update_prices
+
 # Directories potentially created on remote AFP share
 .AppleDB
 .AppleDesktop
@@ -160,3 +162,4 @@ Temporary Items
 build
 builds
 go.sum
+

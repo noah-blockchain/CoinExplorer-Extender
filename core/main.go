@@ -150,6 +150,12 @@ func (ext *Extender) Run() {
 	}
 
 	for {
+
+		if height == 463645 {
+			height ++
+			continue
+		}
+
 		start := time.Now()
 		ext.findOutChasingMode(height)
 		//Pulling block data

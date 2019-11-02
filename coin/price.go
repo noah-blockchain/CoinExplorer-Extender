@@ -59,7 +59,7 @@ func calculatePurchaseAmount(supply *big.Int, reserve *big.Int, crr uint, wantRe
 	return NoahToQNoah(res)
 }
 
-func getTokenPrice(volumeStr string, reserveStr string, crr uint64) string {
+func GetTokenPrice(volumeStr string, reserveStr string, crr uint64) string {
 	volume, _ := convertStringToBigInt(volumeStr)
 	reserve, _ := convertStringToBigInt(reserveStr)
 
