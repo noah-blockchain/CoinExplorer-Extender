@@ -62,7 +62,7 @@ func (s Service) ExtractCoinsFromTransactions(transactions []responses.Transacti
 	var coins []*models.Coin
 	for _, tx := range transactions {
 		if tx.Type == models.TxTypeCreateCoin {
-			if tx.Log != nil {
+			if tx.Log != nil { // protection. Coin maybe not created in blockchain
 				s.logger.Error(*tx.Log)
 				continue
 			}

@@ -41,8 +41,8 @@ func TestCalculateTokenCapitalization(t *testing.T) {
 	price := GetTokenPrice(volume, reserve, crr)
 
 	capitalization := GetCapitalization(volume, price)
-	if capitalization != "9999999999999999999599999999998058037248" {
-		t.Error("Capitalization must be 9999999999999999999599999999998058037248 but now ", capitalization)
+	if capitalization != "10000000000000000000000" {
+		t.Error("Capitalization must be 10000000000000000000000 but now ", capitalization)
 	}
 
 	volume = "600"
@@ -52,13 +52,13 @@ func TestCalculateTokenCapitalization(t *testing.T) {
 	price = GetTokenPrice(volume, reserve, crr)
 
 	capitalization = GetCapitalization(volume, price)
-	if capitalization != "100753343075027031908999999999994813743104" {
-		t.Error("Capitalization must be 100753343075027031908999999999994813743104 but now ", capitalization)
+	if capitalization != "100753343075027028803584" {
+		t.Error("Capitalization must be 100753343075027028803584 but now ", capitalization)
 	}
 
 	volume = "666000000000000000000"
 	capitalization = GetCapitalization(volume, "1")
-	if capitalization != "666000000000000000000000000000000000000" {
-		t.Error("Capitalization must be 666000000000000000000000000000000000000 but now ", capitalization)
+	if capitalization != "666000000000000000000" {
+		t.Error("Capitalization must be 666000000000000000000 but now ", capitalization)
 	}
 }
