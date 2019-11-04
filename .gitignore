@@ -150,6 +150,7 @@ Icon
 .com.apple.timemachine.donotpresent
 
 cmd/update_prices
+cmd/update_capitalization
 
 # Directories potentially created on remote AFP share
 .AppleDB

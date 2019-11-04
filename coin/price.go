@@ -65,3 +65,14 @@ func GetTokenPrice(volumeStr string, reserveStr string, crr uint64) string {
 
 	return calculatePurchaseAmount(volume, reserve, uint(crr), big.NewInt(1)).String()
 }
+
+func GetCapitalization(volumeStr string, priceStr string) string {
+	volume, _ := convertStringToBigInt(volumeStr)
+	price, _ := convertStringToBigInt(priceStr)
+
+	tVolume := newFloat(0).SetInt(volume)
+	tPrice := newFloat(0).SetInt(price)
+	tVolume.Mul(tVolume, tPrice)
+
+	return NoahToQNoah(tVolume).String()
+}

@@ -62,6 +62,11 @@ func (s Service) ExtractCoinsFromTransactions(transactions []responses.Transacti
 	var coins []*models.Coin
 	for _, tx := range transactions {
 		if tx.Type == models.TxTypeCreateCoin {
+			if tx.Log != nil {
+				s.logger.Error(*tx.Log)
+				continue
+			}
+
 			coin, err := s.ExtractFromTx(tx)
 			if err != nil {
 				s.logger.Error(err)
@@ -96,6 +101,7 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		Price:          GetTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
 		Delegated:      0,
 	}
+	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
 	go s.updateCoinAddressInfo(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
 	go s.updateCoinTransactionInfo(coin.Symbol, helpers.RemovePrefix(tx.Hash))
@@ -112,15 +118,16 @@ func (s *Service) updateCoinAddressInfo(symbol string, address string) {
 			fromId, err := s.addressRepository.FindId(address)
 			if err != nil {
 				s.logger.Error(err)
-			} else {
-				s.logger.Error("updateCoinAddressInfo fromId: ", fromId)
-				if err = s.repository.UpdateCoinOwner(symbol, fromId); err == nil {
-					s.logger.Error("updateCoinAddressInfo Stop")
-					ticker.Stop()
-					break
-				}
-				s.logger.Error("updateCoinAddressInfo ERROR: ", err)
+				return
 			}
+
+			s.logger.Error("updateCoinAddressInfo fromId: ", fromId)
+			if err = s.repository.UpdateCoinOwner(symbol, fromId); err == nil {
+				s.logger.Error("updateCoinAddressInfo Stop")
+				ticker.Stop()
+				break
+			}
+			s.logger.Error("updateCoinAddressInfo ERROR: ", err)
 		}
 	}
 }
@@ -134,15 +141,16 @@ func (s *Service) updateCoinTransactionInfo(symbol string, hash string) {
 			fromTxId, err := s.repository.FindTransactionIdByHash(hash)
 			if err != nil {
 				s.logger.Error(err)
-			} else {
-				s.logger.Error("updateCoinTransactionInfo fromTxId: ", fromTxId)
-				if err = s.repository.UpdateCoinTransaction(symbol, fromTxId); err == nil {
-					s.logger.Error("updateCoinTransactionInfo Stop")
-					ticker.Stop()
-					break
-				}
-				s.logger.Error("updateCoinTransactionInfo ERROR: ", err)
+				return
 			}
+
+			s.logger.Error("updateCoinTransactionInfo fromTxId: ", fromTxId)
+			if err = s.repository.UpdateCoinTransaction(symbol, fromTxId); err == nil {
+				s.logger.Error("updateCoinTransactionInfo Stop")
+				ticker.Stop()
+				break
+			}
+			s.logger.Error("updateCoinTransactionInfo ERROR: ", err)
 		}
 	}
 }
@@ -250,6 +258,7 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.UpdatedAt = now
 	coin.Delegated = 0
 	coin.Price = GetTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
+	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
 	return coin, nil
 }
