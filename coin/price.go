@@ -1,7 +1,6 @@
 package coin
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/noah-blockchain/noah-go-node/core/types"
@@ -68,14 +67,9 @@ func GetTokenPrice(volumeStr string, reserveStr string, crr uint64) string {
 }
 
 func GetCapitalization(volumeStr string, priceStr string) string {
-	volume, _ := convertStringToBigInt(volumeStr)
-	price, _ := convertStringToBigInt(priceStr)
-
-	tVolume := newFloat(0).SetInt(volume)
-	tPrice := newFloat(0).SetInt(price)
+	tVolume, _ := newFloat(0).SetString(volumeStr)
+	tPrice, _ := newFloat(0).SetString(priceStr)
 	tVolume.Mul(tVolume, tPrice)
-	v, _ := tVolume.Float64()
 
-
-	return fmt.Sprintf("%.f", v)
+	return tVolume.String()
 }

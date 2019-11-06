@@ -1,6 +1,7 @@
 package coin
 
 import (
+	"math/big"
 	"testing"
 )
 
@@ -33,32 +34,35 @@ func TestCalculateTokenPrice(t *testing.T) {
 	}
 }
 
+func ConvertCapitalizationQNoahToNoah(value string) string {
+	if value == "" {
+		return "0"
+	}
+	var twiceQNoahToNoah = big.NewFloat(1000000000000000000000000000000000000)
+	floatValue, _ := new(big.Float).SetPrec(500).SetString(value)
+	return new(big.Float).SetPrec(500).Quo(floatValue, twiceQNoahToNoah).Text('f', 18)
+}
+
 func TestCalculateTokenCapitalization(t *testing.T) {
-	volume := "600"
-	reserve := "10000"
-	var crr uint64 = 100
+	volume := "1000495425641816924540763"
+	price := "3506938666610866169"
 
-	price := GetTokenPrice(volume, reserve, crr)
-
-	capitalization := GetCapitalization(volume, price)
-	if capitalization != "10000000000000000000000" {
-		t.Error("Capitalization must be 10000000000000000000000 but now ", capitalization)
+	capitalization := ConvertCapitalizationQNoahToNoah(GetCapitalization(volume, price))
+	if capitalization != "3508676.093999999851159724" {
+		t.Error("Capitalization must be 3508676.093999999851159724 but now ", capitalization)
 	}
 
-	volume = "600"
-	reserve = "10000"
-	crr = 10
-
-	price = GetTokenPrice(volume, reserve, crr)
-
-	capitalization = GetCapitalization(volume, price)
-	if capitalization != "100753343075027028803584" {
-		t.Error("Capitalization must be 100753343075027028803584 but now ", capitalization)
+	volume = "1672243766121708484342"
+	price = "1022577590444008568724"
+	capitalization = ConvertCapitalizationQNoahToNoah(GetCapitalization(volume, price))
+	if capitalization != "1709999.000999999927460752" {
+		t.Error("Capitalization must be 1709999.000999999927460752 but now ", capitalization)
 	}
 
-	volume = "666000000000000000000"
-	capitalization = GetCapitalization(volume, "1")
-	if capitalization != "666000000000000000000" {
-		t.Error("Capitalization must be 666000000000000000000 but now ", capitalization)
+	volume = "1837730042574115525015"
+	price = "209654952685560632237"
+	capitalization = ConvertCapitalizationQNoahToNoah(GetCapitalization(volume, price))
+	if capitalization != "385289.205099999983655786" {
+		t.Error("Capitalization must be 385289.205099999983655786 but now ", capitalization)
 	}
 }
