@@ -1,18 +1,25 @@
 package validator
 
 import (
+	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"time"
 
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
 	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
+	"github.com/noah-blockchain/CoinExplorer-Extender/utils"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	precision = 100
 )
 
 type Service struct {
@@ -147,6 +154,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 
 		var (
 			stakes       []*models.Stake
+			stakesInCoin = make(map[uint64]string)
 			validatorIds = make([]uint64, len(resp.Result))
 			validators   = make([]*models.Validator, len(resp.Result))
 			addressesMap = make(map[string]struct{})
@@ -195,8 +203,22 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 					OwnerAddressID: ownerAddressID,
 					CoinID:         coinID,
 					Value:          stake.Value,
-					NoahValue:      stake.Value,
+					NoahValue:      stake.NoahValue,
 				})
+
+				if stake.Coin == s.env.BaseCoin {
+					continue
+				}
+
+				v, ok := stakesInCoin[coinID]
+				if ok {
+					valueInt := utils.ConvertStringToBigInt(v)
+					stakeInt := utils.ConvertStringToBigInt(stake.Value)
+					valueInt.Add(valueInt, stakeInt)
+					stakesInCoin[coinID] = valueInt.String()
+				} else {
+					stakesInCoin[coinID] = stake.Value
+				}
 			}
 		}
 
@@ -221,6 +243,28 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 		err = s.repository.DeleteStakesNotInListIds(stakesId)
 		if err != nil {
 			s.logger.Error(errors.WithStack(err))
+		}
+
+		for k, v := range stakesInCoin {
+			go func(coinID uint64, stake string) {
+				fmt.Println(fmt.Sprintf("coinID = %d stake = %s", coinID, stake))
+				currentCoin, err := s.coinRepository.FindCoinBySymbol(coinID)
+				if err != nil {
+					s.logger.Error(errors.WithStack(err))
+					return
+				}
+
+				stakeFloat, _ := utils.NewFloat(0, precision).SetString(stake)
+				volumeFloat, _ := utils.NewFloat(0, precision).SetString(currentCoin.Volume)
+				stakeFloat.Quo(stakeFloat, volumeFloat)
+				stakeFloat.Mul(stakeFloat, big.NewFloat(precision))
+				delegated, _ := stakeFloat.Uint64()
+
+				if err = s.coinRepository.UpdateCoinDelegation(coinID, delegated); err != nil {
+					s.logger.Error(errors.WithStack(err))
+					return
+				}
+			}(k, v)
 		}
 	}
 }

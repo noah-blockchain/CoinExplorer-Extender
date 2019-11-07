@@ -41,6 +41,20 @@ func (r *Repository) FindIdBySymbol(symbol string) (uint64, error) {
 	return coin.ID, nil
 }
 
+// Find coin by symbol
+func (r *Repository) FindCoinBySymbol(id uint64) (*models.Coin, error) {
+	coin := new(models.Coin)
+	err := r.db.Model(coin).
+		Column("id", "crr", "volume", "reserve_balance", "name", "price", "delegated", "updated_at", "capitalization").
+		Where("id = ?", id).
+		Select()
+
+	if err != nil {
+		return nil, err
+	}
+	return coin, nil
+}
+
 func (r *Repository) FindSymbolById(id uint64) (string, error) {
 	//First look in the cache
 	symbol, ok := r.invCache.Load(id)
@@ -106,7 +120,6 @@ func (r *Repository) FindTransactionIdByHash(hash string) (uint64, error) {
 	return tx.ID, nil
 }
 
-
 func (r *Repository) UpdateCoinOwner(symbol string, creationAddressID uint64) error {
 	coin := models.Coin{CreationAddressID: &creationAddressID}
 	_, err := r.db.Model(&coin).Column("creation_address_id").Where("symbol = ?", symbol).Update()
@@ -116,6 +129,14 @@ func (r *Repository) UpdateCoinOwner(symbol string, creationAddressID uint64) er
 	return nil
 }
 
+func (r *Repository) UpdateCoinDelegation(id uint64, delegated uint64) error {
+	coin := models.Coin{Delegated: delegated}
+	_, err := r.db.Model(&coin).Column("delegated").Where("id = ?", id).Update()
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func (r *Repository) UpdateCoinTransaction(symbol string, creationTransactionID uint64) error {
 	coin := models.Coin{CreationTransactionID: &creationTransactionID}

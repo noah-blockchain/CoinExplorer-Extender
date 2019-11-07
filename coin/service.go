@@ -256,7 +256,6 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.Volume = coinResp.Result.Volume
 	coin.DeletedAt = nil
 	coin.UpdatedAt = now
-	coin.Delegated = 0
 	coin.Price = GetTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 

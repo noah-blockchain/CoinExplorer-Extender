@@ -209,7 +209,8 @@ func (ext *Extender) runWorkers() {
 	}
 	//обновляет награды валидаторов
 	go ext.validatorService.UpdateValidatorsWorker(ext.validatorService.GetUpdateValidatorsJobChannel())
-	//обновляет награды валидаторов
+
+	//обновляет стейки валидаторов
 	go ext.validatorService.UpdateStakesWorker(ext.validatorService.GetUpdateStakesJobChannel())
 
 	// Events
