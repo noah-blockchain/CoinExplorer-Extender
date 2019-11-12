@@ -2,11 +2,13 @@ package coin
 
 import (
 	"errors"
+	"fmt"
+	"github.com/dgraph-io/badger"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"strconv"
 	"time"
 
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
-	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
@@ -27,10 +29,12 @@ type Service struct {
 	logger                *logrus.Entry
 	jobUpdateCoins        chan []*models.Transaction
 	jobUpdateCoinsFromMap chan map[string]struct{}
+	dbCoinWorker          *badger.DB
 }
 
 func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
-	addressRepository *address.Repository, logger *logrus.Entry) *Service {
+	addressRepository *address.Repository, logger *logrus.Entry, dbCoinWorker *badger.DB) *Service {
+
 	return &Service{
 		env:                   env,
 		nodeApi:               nodeApi,
@@ -39,6 +43,7 @@ func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahN
 		logger:                logger,
 		jobUpdateCoins:        make(chan []*models.Transaction, 1),
 		jobUpdateCoinsFromMap: make(chan map[string]struct{}, 1),
+		dbCoinWorker:          dbCoinWorker,
 	}
 }
 
@@ -102,56 +107,20 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 	}
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
-	go s.updateCoinAddressInfo(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
-	go s.updateCoinTransactionInfo(coin.Symbol, helpers.RemovePrefix(tx.Hash))
+
+	addressKey := fmt.Sprintf("address_%s_%s", coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
+	err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
+		return txn.Set([]byte(addressKey), []byte(""))
+	})
+	s.logger.Error(err)
+
+	trxKey := fmt.Sprintf("trx_%s_%s", coin.Symbol, helpers.RemovePrefix(tx.Hash))
+	err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
+		return txn.Set([]byte(trxKey), []byte(""))
+	})
+	s.logger.Error(err)
 
 	return coin, nil
-}
-
-func (s *Service) updateCoinAddressInfo(symbol string, address string) {
-	ticker := time.NewTicker(updaterWorkerAddressTimeout)
-
-	for { // nolint:gosimple
-		select {
-		case <-ticker.C:
-			fromId, err := s.addressRepository.FindId(address)
-			if err != nil {
-				s.logger.Error(err)
-				return
-			}
-
-			s.logger.Error("updateCoinAddressInfo fromId: ", fromId)
-			if err = s.repository.UpdateCoinOwner(symbol, fromId); err == nil {
-				s.logger.Error("updateCoinAddressInfo Stop")
-				ticker.Stop()
-				break
-			}
-			s.logger.Error("updateCoinAddressInfo ERROR: ", err)
-		}
-	}
-}
-
-func (s *Service) updateCoinTransactionInfo(symbol string, hash string) {
-	ticker := time.NewTicker(updaterWorkerTransactionTimeout)
-
-	for { // nolint:gosimple
-		select {
-		case <-ticker.C:
-			fromTxId, err := s.repository.FindTransactionIdByHash(hash)
-			if err != nil {
-				s.logger.Error(err)
-				return
-			}
-
-			s.logger.Error("updateCoinTransactionInfo fromTxId: ", fromTxId)
-			if err = s.repository.UpdateCoinTransaction(symbol, fromTxId); err == nil {
-				s.logger.Error("updateCoinTransactionInfo Stop")
-				ticker.Stop()
-				break
-			}
-			s.logger.Error("updateCoinTransactionInfo ERROR: ", err)
-		}
-	}
 }
 
 func (s *Service) CreateNewCoins(coins []*models.Coin) error {
@@ -259,4 +228,18 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
 	return coin, nil
+}
+
+func (s *Service) UpdateCoinTransaction(symbol string, creationTransactionID uint64) error {
+	if err := s.repository.UpdateCoinTransaction(symbol, creationTransactionID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) UpdateCoinOwner(symbol string, creationAddressID uint64) error {
+	if err := s.repository.UpdateCoinOwner(symbol, creationAddressID); err != nil {
+		return err
+	}
+	return nil
 }

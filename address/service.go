@@ -164,6 +164,15 @@ func (s *Service) HandleResponses(blockResponse *responses.BlockResponse, events
 	return nil
 }
 
+func (s *Service) FindId(address string) (uint64, error) {
+	addrID, err := s.repository.FindId(address)
+	if err != nil {
+		return 0, err
+	}
+	return addrID, nil
+}
+
+
 func addressesMapToSlice(mapAddresses map[string]struct{}) []string {
 	addresses := make([]string, len(mapAddresses))
 	i := 0
