@@ -33,3 +33,10 @@ func ConvertCapitalizationQNoahToNoah(value string) string {
 	floatValue, _ := new(big.Float).SetPrec(500).SetString(value)
 	return new(big.Float).SetPrec(500).Quo(floatValue, twiceQNoahToNoah).Text('f', 18)
 }
+
+func Min(x, y uint64) uint64 {
+	if x > y {
+		return y
+	}
+	return x
+}

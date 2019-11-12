@@ -257,6 +257,7 @@ CREATE TABLE public.coins
     delegated               integer                  default 0,
     name                    character varying(255),
     symbol                  character varying(20)                  NOT NULL,
+    created_at              timestamp with time zone DEFAULT now() NOT NULL,
     updated_at              timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at              timestamp with time zone               NULL
 );

@@ -240,15 +240,19 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 		for i, stake := range stakes {
 			stakesId[i] = stake.ID
 		}
-		err = s.repository.DeleteStakesNotInListIds(stakesId)
-		if err != nil {
+		if err = s.repository.DeleteStakesNotInListIds(stakesId); err != nil {
 			s.logger.Error(errors.WithStack(err))
 		}
 
+		coinsId := make([]uint64, len(stakesInCoin))
+		index := 0
 		for k, v := range stakesInCoin {
+			coinsId[index] = k
+			index++
+
 			go func(coinID uint64, stake string) {
 				fmt.Println(fmt.Sprintf("coinID = %d stake = %s", coinID, stake))
-				currentCoin, err := s.coinRepository.FindCoinBySymbol(coinID)
+				currentCoin, err := s.coinRepository.FindCoinByID(coinID)
 				if err != nil {
 					s.logger.Error(errors.WithStack(err))
 					return
@@ -257,15 +261,21 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 				stakeFloat, _ := utils.NewFloat(0, precision).SetString(stake)
 				volumeFloat, _ := utils.NewFloat(0, precision).SetString(currentCoin.Volume)
 				stakeFloat.Quo(stakeFloat, volumeFloat)
-				stakeFloat.Mul(stakeFloat, big.NewFloat(precision))
+				stakeFloat.Mul(stakeFloat, big.NewFloat(100))
 				delegated, _ := stakeFloat.Uint64()
 
-				if err = s.coinRepository.UpdateCoinDelegation(coinID, delegated); err != nil {
+				if err = s.coinRepository.UpdateCoinDelegation(coinID, utils.Min(delegated, 100)); err != nil {
 					s.logger.Error(errors.WithStack(err))
 					return
 				}
 			}(k, v)
+
 		}
+
+		if err = s.coinRepository.ResetCoinDelegationNotInListIds(coinsId); err != nil {
+			s.logger.Error(errors.WithStack(err))
+		}
+
 	}
 }
 

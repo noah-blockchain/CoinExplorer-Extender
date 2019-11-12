@@ -42,7 +42,7 @@ func (r *Repository) FindIdBySymbol(symbol string) (uint64, error) {
 }
 
 // Find coin by symbol
-func (r *Repository) FindCoinBySymbol(id uint64) (*models.Coin, error) {
+func (r *Repository) FindCoinByID(id uint64) (*models.Coin, error) {
 	coin := new(models.Coin)
 	err := r.db.Model(coin).
 		Column("id", "crr", "volume", "reserve_balance", "name", "price", "delegated", "updated_at", "capitalization").
@@ -137,6 +137,24 @@ func (r *Repository) UpdateCoinDelegation(id uint64, delegated uint64) error {
 	}
 	return nil
 }
+
+//func (r *Repository) ResetCoinDelegation() error {
+//	coin := models.Coin{Delegated: 0}
+//	_, err := r.db.Model(&coin).Column("delegated").Update()
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}
+
+func (r Repository) ResetCoinDelegationNotInListIds(idList []uint64) error {
+	if len(idList) > 0 {
+		_, err := r.db.Query(nil, `update coins set delegated=0 where id not in (?) and delegated > 0;`, pg.In(idList))
+		return err
+	}
+	return nil
+}
+
 
 func (r *Repository) UpdateCoinTransaction(symbol string, creationTransactionID uint64) error {
 	coin := models.Coin{CreationTransactionID: &creationTransactionID}

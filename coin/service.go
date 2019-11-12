@@ -99,7 +99,6 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		Symbol:         txData.Symbol,
 		DeletedAt:      nil,
 		Price:          GetTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
-		Delegated:      0,
 	}
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
