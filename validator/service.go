@@ -65,7 +65,7 @@ func (s *Service) UpdateValidatorsWorker(jobs <-chan uint64) {
 		}
 
 		if resp.Error != nil {
-			s.logger.Errorf("UpdateValidatorsWorker error: message=%s and data=%s height=%d", resp.Error.Message, resp.Error.Data, height) // todo
+			//s.logger.Errorf("UpdateValidatorsWorker error: message=%s and data=%s height=%d", resp.Error.Message, resp.Error.Data, height) // todo
 			continue
 		}
 

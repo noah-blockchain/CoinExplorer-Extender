@@ -3,22 +3,17 @@ package coin
 import (
 	"errors"
 	"fmt"
-	"github.com/dgraph-io/badger"
-	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"strconv"
 	"time"
 
+	"github.com/dgraph-io/badger"
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	updaterWorkerAddressTimeout     = 2 * time.Second
-	updaterWorkerTransactionTimeout = 3 * time.Second
 )
 
 type Service struct {
@@ -107,16 +102,15 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 	}
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
-
 	addressKey := fmt.Sprintf("address_%s_%s", coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
 	err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
-		return txn.Set([]byte(addressKey), []byte(""))
+		return txn.Set([]byte(addressKey), []byte("active"))
 	})
 	s.logger.Error(err)
 
 	trxKey := fmt.Sprintf("trx_%s_%s", coin.Symbol, helpers.RemovePrefix(tx.Hash))
 	err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
-		return txn.Set([]byte(trxKey), []byte(""))
+		return txn.Set([]byte(trxKey), []byte("active"))
 	})
 	s.logger.Error(err)
 

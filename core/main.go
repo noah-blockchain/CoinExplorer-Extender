@@ -1,13 +1,11 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dgraph-io/badger"
@@ -24,7 +22,6 @@ import (
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
-	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -61,7 +58,7 @@ type dbLogger struct {
 func (d dbLogger) BeforeQuery(q *pg.QueryEvent) {}
 
 func (d dbLogger) AfterQuery(q *pg.QueryEvent) {
-	d.logger.Info(q.FormattedQuery())
+	//d.logger.Info(q.FormattedQuery())
 }
 
 func NewExtender(env *models.ExtenderEnvironment) *Extender {
@@ -154,32 +151,36 @@ func (ext *Extender) coinWorker() {
 			for it.Rewind(); it.Valid(); it.Next() {
 				item := it.Item()
 				k := item.Key()
-				fmt.Println("KEY ", string(k))
+				ext.logger.Println("KEY ", string(k))
+
 				s := strings.Split(string(k), "_") // (trx/address)_symbol_(hash/addr)
 				if len(s) != 3 {
 					_ = txn.Delete(k)
 					continue
 				}
+				command := s[0]
+				symbol := s[1]
+				value := s[2]
 
-				if s[0] == "address" {
-					addrID, err := ext.addressService.FindId(s[2])
+				if command == "address" {
+					addrID, err := ext.addressService.FindId(value)
 					if err != nil {
 						ext.logger.Error(err)
 						continue
 					}
 
-					if err = ext.coinService.UpdateCoinOwner(s[1], addrID); err != nil {
+					if err = ext.coinService.UpdateCoinOwner(symbol, addrID); err != nil {
 						ext.logger.Error(err)
 						continue
 					}
-				} else if s[0] == "trx" {
-					trxID, err := ext.transactionService.FindTransactionIdByHash(s[2])
+				} else if command == "trx" {
+					trxID, err := ext.transactionService.FindTransactionIdByHash(value)
 					if err != nil {
 						ext.logger.Error(err)
 						continue
 					}
 
-					if err = ext.coinService.UpdateCoinTransaction(s[1], trxID); err != nil {
+					if err = ext.coinService.UpdateCoinTransaction(symbol, trxID); err != nil {
 						ext.logger.Error(err)
 						continue
 					}
@@ -196,7 +197,7 @@ func (ext *Extender) coinWorker() {
 			ext.logger.Error(err)
 		}
 
-		ext.logger.Println("Next attempt")
+		ext.logger.Println("Coin Worker. New attempt")
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -224,8 +225,6 @@ func (ext *Extender) Run() {
 	} else {
 		height = 1
 	}
-
-	//height = 645764
 
 	for {
 
@@ -470,303 +469,4 @@ func (ext *Extender) findOutChasingMode(height uint64) {
 		helpers.HandleError(err)
 		ext.chasingMode = ext.currentNodeHeight-height > ChasingModDiff
 	}
-}
-
-func (egu *Extender) Do() error {
-	egu.logger.Info("Getting genesis data...")
-	url := egu.env.NodeApi + "/genesis"
-	_, data, err := fasthttp.Get(nil, url)
-	helpers.HandleError(err)
-	genesisResponse := new(GenesisResponse)
-	err = json.Unmarshal(data, genesisResponse)
-	helpers.HandleError(err)
-	egu.logger.Info("Genesis data has been downloading")
-
-	genesis := &genesisResponse.Result.Genesis
-
-	egu.logger.Info("Extracting addresses...")
-	addresses, err := egu.extractAddresses(genesis)
-	helpers.HandleError(err)
-	msg := fmt.Sprintf("%d addresses have been extracting", len(addresses))
-	egu.logger.Info(msg)
-
-	egu.logger.Info("Extracting coins...")
-	coins, err := egu.extractCoins(genesis)
-	helpers.HandleError(err)
-	msg = fmt.Sprintf("%d coins has been extracting", len(coins))
-	egu.logger.Info(msg)
-
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
-	go egu.saveAddresses(addresses, wg)
-	go egu.saveCoins(coins, wg)
-	wg.Wait()
-
-	egu.logger.Info("Extracting validators...")
-	validators, err := egu.extractCandidates(genesis)
-	helpers.HandleError(err)
-	msg = fmt.Sprintf("%d validators have been extracting", len(validators))
-	egu.logger.Info(msg)
-	err = egu.saveCandidates(validators)
-	helpers.HandleError(err)
-	egu.logger.Info("Validators has been uploading")
-
-	egu.logger.Info("Extracting balances...")
-	balances, err := egu.extractBalances(genesis)
-	helpers.HandleError(err)
-	msg = fmt.Sprintf("%d balances has been extracting", len(balances))
-	egu.logger.Info(msg)
-	err = egu.saveBalances(balances)
-	helpers.HandleError(err)
-	egu.logger.Info("Balances has been uploading")
-
-	egu.logger.Info("Extracting stakes...")
-	stakes, err := egu.extractStakes(genesis)
-	helpers.HandleError(err)
-	msg = fmt.Sprintf("%d stakes have been extracting", len(stakes))
-	egu.logger.Info(msg)
-	err = egu.saveStakes(stakes)
-	helpers.HandleError(err)
-	egu.logger.Info("Stakes has been uploading")
-
-	egu.logger.Info("Upload complete")
-	return err
-}
-
-func (egu *Extender) extractAddresses(genesis *Genesis) ([]string, error) {
-	addressesMap := make(map[string]struct{})
-	for _, val := range genesis.AppState.Validators {
-		addressesMap[helpers.RemovePrefixFromAddress(val.RewardAddress)] = struct{}{}
-	}
-	for _, candidate := range genesis.AppState.Candidates {
-		addressesMap[helpers.RemovePrefixFromAddress(candidate.RewardAddress)] = struct{}{}
-		addressesMap[helpers.RemovePrefixFromAddress(candidate.OwnerAddress)] = struct{}{}
-		for _, stake := range candidate.Stakes {
-			addressesMap[helpers.RemovePrefixFromAddress(stake.Owner)] = struct{}{}
-		}
-	}
-	for _, account := range genesis.AppState.Accounts {
-		addressesMap[helpers.RemovePrefixFromAddress(account.Address)] = struct{}{}
-	}
-	var addresses = make([]string, len(addressesMap))
-	i := 0
-	for adr := range addressesMap {
-		addresses[i] = adr
-		i++
-	}
-	return addresses, nil
-}
-
-func (egu *Extender) extractCoins(genesis *Genesis) ([]*models.Coin, error) {
-	var coins = make([]*models.Coin, len(genesis.AppState.Coins))
-	i := 0
-	for _, c := range genesis.AppState.Coins {
-		crr, err := strconv.ParseUint(c.Crr, 10, 64)
-		if err != nil {
-			egu.logger.Error(err)
-		}
-		coins[i] = &models.Coin{
-			Name:           c.Name,
-			Symbol:         c.Symbol,
-			Crr:            crr,
-			Volume:         c.Volume,
-			ReserveBalance: c.ReserveBalance,
-			UpdatedAt:      time.Now(),
-		}
-		i++
-	}
-	return coins, nil
-}
-
-func (egu *Extender) extractStakes(genesis *Genesis) ([]*models.Stake, error) {
-	var stakes []*models.Stake
-	for _, candidate := range genesis.AppState.Candidates {
-		for _, stake := range candidate.Stakes {
-			coinId, err := egu.coinRepository.FindIdBySymbol(stake.Coin)
-			if err != nil {
-				egu.logger.Error(err)
-			}
-			ownerId, err := egu.addressRepository.FindId(helpers.RemovePrefixFromAddress(stake.Owner))
-			if err != nil {
-				egu.logger.Error(err)
-			}
-			validatorId, err := egu.validatorRepository.FindIdByPk(helpers.RemovePrefix(candidate.PubKey))
-			if err != nil {
-				egu.logger.Error(err)
-			}
-			stakes = append(stakes, &models.Stake{
-				CoinID:         coinId,
-				OwnerAddressID: ownerId,
-				ValidatorID:    validatorId,
-				Value:          stake.Value,
-				NoahValue:      stake.NoahValue,
-			})
-		}
-	}
-	return stakes, nil
-}
-
-func (egu *Extender) extractBalances(genesis *Genesis) ([]*models.Balance, error) {
-	var balances []*models.Balance
-	for _, account := range genesis.AppState.Accounts {
-		addressId, err := egu.addressRepository.FindId(helpers.RemovePrefixFromAddress(account.Address))
-		if err != nil {
-			egu.logger.Error(err)
-		}
-		for _, bls := range account.Balance {
-			coinId, err := egu.coinRepository.FindIdBySymbol(bls.Coin)
-			if err != nil {
-				egu.logger.Error(err)
-			}
-			balances = append(balances, &models.Balance{
-				CoinID:    coinId,
-				AddressID: addressId,
-				Value:     bls.Value,
-			})
-		}
-	}
-	return balances, nil
-}
-
-func (egu Extender) extractCandidates(genesis *Genesis) ([]*models.Validator, error) {
-	var validators []*models.Validator
-	for _, candidate := range genesis.AppState.Candidates {
-		ownerAddress, err := egu.addressRepository.FindId(helpers.RemovePrefixFromAddress(candidate.OwnerAddress))
-		if err != nil {
-			egu.logger.Error(err)
-		}
-		rewardAddress, err := egu.addressRepository.FindId(helpers.RemovePrefixFromAddress(candidate.RewardAddress))
-		if err != nil {
-			egu.logger.Error(err)
-		}
-		status := uint8(candidate.Status)
-		commission, err := strconv.ParseUint(candidate.Commission, 10, 64)
-		stake := candidate.TotalNoahStake
-		validators = append(append(validators, &models.Validator{
-			OwnerAddressID:  &ownerAddress,
-			RewardAddressID: &rewardAddress,
-			PublicKey:       helpers.RemovePrefix(candidate.PubKey),
-			Status:          &status,
-			Commission:      &commission,
-			TotalStake:      &stake,
-		}))
-	}
-
-	return validators, nil
-}
-
-func (egu *Extender) saveAddresses(addresses []string, wg *sync.WaitGroup) {
-	if len(addresses) > 0 {
-		wgAddresses := new(sync.WaitGroup)
-		chunksCount := int(math.Ceil(float64(len(addresses)) / float64(egu.env.AddrChunkSize)))
-		for i := 0; i < chunksCount; i++ {
-			start := egu.env.AddrChunkSize * i
-			end := start + egu.env.AddrChunkSize
-			if end > len(addresses) {
-				end = len(addresses)
-			}
-			wgAddresses.Add(1)
-			go func() {
-				err := egu.addressRepository.SaveAllIfNotExist(addresses[start:end])
-				helpers.HandleError(err)
-				wgAddresses.Done()
-			}()
-		}
-		wgAddresses.Wait()
-	}
-	wg.Done()
-	egu.logger.Info("Addresses has been uploading")
-}
-
-func (egu *Extender) saveCoins(coins []*models.Coin, wg *sync.WaitGroup) {
-	if len(coins) > 0 {
-		wgCoins := new(sync.WaitGroup)
-		chunksCount := int(math.Ceil(float64(len(coins)) / float64(egu.env.TxChunkSize)))
-		for i := 0; i < chunksCount; i++ {
-			start := egu.env.TxChunkSize * i
-			end := start + egu.env.TxChunkSize
-			if end > len(coins) {
-				end = len(coins)
-			}
-			wgCoins.Add(1)
-			go func() {
-				err := egu.coinRepository.SaveAllIfNotExist(coins[start:end])
-				helpers.HandleError(err)
-				wgCoins.Done()
-			}()
-		}
-		wgCoins.Wait()
-	}
-	wg.Done()
-	egu.logger.Info("Coins has been uploading")
-}
-
-func (egu *Extender) saveCandidates(validators []*models.Validator) error {
-	if len(validators) > 0 {
-		wgCandidates := new(sync.WaitGroup)
-		chunksCount := int(math.Ceil(float64(len(validators)) / float64(egu.env.TxChunkSize)))
-		for i := 0; i < chunksCount; i++ {
-			start := egu.env.TxChunkSize * i
-			end := start + egu.env.TxChunkSize
-			if end > len(validators) {
-				end = len(validators)
-			}
-			wgCandidates.Add(1)
-			go func() {
-				err := egu.validatorRepository.SaveAllIfNotExist(validators[start:end])
-				helpers.HandleError(err)
-				wgCandidates.Done()
-			}()
-		}
-		wgCandidates.Wait()
-	}
-	return nil
-}
-
-func (egu *Extender) saveBalances(balances []*models.Balance) error {
-	if len(balances) > 0 {
-		wgBalances := new(sync.WaitGroup)
-		chunksCount := int(math.Ceil(float64(len(balances)) / float64(egu.env.TxChunkSize)))
-		for i := 0; i < chunksCount; i++ {
-			start := egu.env.TxChunkSize * i
-			end := start + egu.env.TxChunkSize
-			if end > len(balances) {
-				end = len(balances)
-			}
-			wgBalances.Add(1)
-			go func() {
-				err := egu.balanceRepository.SaveAll(balances[start:end])
-				if err != nil {
-					egu.logger.Error(err)
-				}
-				wgBalances.Done()
-			}()
-			wgBalances.Wait()
-		}
-	}
-	return nil
-}
-
-func (egu *Extender) saveStakes(stakes []*models.Stake) error {
-	if len(stakes) > 0 {
-		wgStakes := new(sync.WaitGroup)
-		chunksCount := int(math.Ceil(float64(len(stakes)) / float64(egu.env.TxChunkSize)))
-		for i := 0; i < chunksCount; i++ {
-			start := egu.env.TxChunkSize * i
-			end := start + egu.env.TxChunkSize
-			if end > len(stakes) {
-				end = len(stakes)
-			}
-			wgStakes.Add(1)
-			go func() {
-				err := egu.validatorRepository.SaveAllStakes(stakes[start:end])
-				if err != nil {
-					egu.logger.Error(err)
-				}
-				wgStakes.Done()
-			}()
-			wgStakes.Wait()
-		}
-	}
-	return nil
 }
