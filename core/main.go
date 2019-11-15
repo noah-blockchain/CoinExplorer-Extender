@@ -198,7 +198,7 @@ func (ext *Extender) coinWorker() {
 		}
 
 		ext.logger.Println("Coin Worker. New attempt")
-		time.Sleep(5 * time.Second)
+		time.Sleep(15 * time.Second)
 	}
 }
 

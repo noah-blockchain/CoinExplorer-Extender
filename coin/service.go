@@ -92,15 +92,18 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 	}
 
 	coin := &models.Coin{
-		Crr:            crr,
-		Volume:         txData.InitialAmount,
-		ReserveBalance: txData.InitialReserve,
-		Name:           txData.Name,
-		Symbol:         txData.Symbol,
-		DeletedAt:      nil,
-		Price:          GetTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
+		Crr:                 crr,
+		Volume:              txData.InitialAmount,
+		ReserveBalance:      txData.InitialReserve,
+		Name:                txData.Name,
+		Symbol:              txData.Symbol,
+		DeletedAt:           nil,
+		Price:               GetTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
+		StartVolume:         txData.InitialAmount,
+		StartReserveBalance: txData.InitialReserve,
 	}
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
+	coin.StartPrice = coin.Price
 
 	addressKey := fmt.Sprintf("address_%s_%s", coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
 	err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {

@@ -152,6 +152,7 @@ Icon
 cmd/update_prices
 cmd/update_capitalization
 cmd/update_created_at
+cmd/update_start_fields
 
 # Directories potentially created on remote AFP share
 .AppleDB
