@@ -610,7 +610,7 @@ CREATE TABLE public.validators
     commission               integer,
     total_stake              numeric(70, 0),
     public_key               character varying(64)                  NOT NULL,
-    update_at                timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at               timestamp with time zone DEFAULT now() NOT NULL,
     name                     varchar(64),
     site_url                 varchar(100),
     icon_url                 varchar(100),

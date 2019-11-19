@@ -11,7 +11,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/noah-blockchain/coinExplorer-tools v0.1.3
+	github.com/noah-blockchain/coinExplorer-tools v0.1.4
 	github.com/noah-blockchain/noah-explorer-tools v0.1.1
 	github.com/noah-blockchain/noah-go-node v0.2.0
 	github.com/noah-blockchain/noah-node-go-api v0.1.1
