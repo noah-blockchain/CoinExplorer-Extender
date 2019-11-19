@@ -1,10 +1,9 @@
 package validator
 
 import (
-	"sync"
-
 	"github.com/go-pg/pg"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
+	"sync"
 )
 
 type Repository struct {
@@ -116,7 +115,6 @@ func (r Repository) DeleteStakesNotInListIds(idList []uint64) error {
 	if len(idList) > 0 {
 		_, err := r.db.Query(nil, `delete from stakes where id not in (?);`, pg.In(idList))
 		return err
-
 	}
 	return nil
 }
@@ -158,4 +156,40 @@ func (r *Repository) isAllAddressesInCache(validators []*models.Validator) bool 
 func (r Repository) ResetAllStatuses() error {
 	_, err := r.db.Query(nil, `update validators set status = null;`)
 	return err
+}
+
+func (r Repository) ResetAllUptimes() error {
+	_, err := r.db.Query(nil, `update validators set uptime = 0.0;`)
+	return err
+}
+func (r Repository) GetSignedCountValidatorBlock(validatorID uint64, blockEndID uint64) (int64, error) {
+	var blockValidator models.BlockValidator
+	var count int64
+
+	blockStartID := blockEndID - 24
+	if blockStartID <= 0 {
+		blockStartID = 1
+	}
+
+	err := r.db.Model(&blockValidator).
+		ColumnExpr("COUNT(block_validator.signed)").
+		Join("LEFT JOIN validators AS v ON v.id = block_validator.validator_id").
+		Where("v.id = ?", validatorID).
+		Where("v.status = ?", models.ValidatorStatusReady).
+		Where("block_validator.block_id >= ?", blockStartID).
+		Where("block_validator.block_id < ?", blockEndID).
+		Select(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *Repository) UpdateValidatorUptime(validatorID uint64, uptime float64) error {
+	validator := models.Validator{Uptime: &uptime}
+	_, err := r.db.Model(&validator).Column("uptime").Where("id = ?", validatorID).Update()
+	if err != nil {
+		return err
+	}
+	return nil
 }
