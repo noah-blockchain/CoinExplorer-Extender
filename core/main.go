@@ -350,11 +350,9 @@ func (ext *Extender) handleBlockResponse(response *responses.BlockResponse) {
 	}
 	helpers.HandleError(err)
 
-	ext.logger.Println(height % 12)
 	// No need to update candidate and stakes at the same time
 	// Candidate will be updated in the next iteration
 	if height%12 == 0 {
-		ext.logger.Println("PARAM TAM TAM")
 		ext.validatorService.GetUpdateStakesJobChannel() <- height
 	} else if height > 1 {
 		ext.validatorService.GetUpdateValidatorsJobChannel() <- height

@@ -121,7 +121,7 @@ func (s *Service) UpdateValidatorsWorker(jobs <-chan uint64) {
 					ID:              id,
 					Status:          &status,
 					TotalStake:      &totalStake,
-					UpdateAt:        &updateAt,
+					UpdatedAt:       &updateAt,
 					Commission:      &commission,
 					RewardAddressID: &rewardAddressID,
 					OwnerAddressID:  &ownerAddressID,
@@ -349,7 +349,7 @@ func (s *Service) HandleCandidateResponse(response *responses.CandidateResponse)
 	}
 	validator.ID = validatorID
 	now := time.Now()
-	validator.UpdateAt = &now
+	validator.UpdatedAt = &now
 
 	stakes, err := s.GetStakesFromCandidateResponse(response)
 	if err != nil {
