@@ -247,7 +247,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 
 		coinsId := make([]uint64, len(stakesInCoin))
 		index := 0
-		for k, v := range stakesInCoin {
+		for k, v := range stakesInCoin { // compute how much was delegated in literally coin into validators
 			coinsId[index] = k
 			index++
 
@@ -276,20 +276,31 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 			s.logger.Error(errors.WithStack(err))
 		}
 
-		if height%24 == 0 { //update uptime
+		if height%192 == 0 { //update uptime
 			_ = s.Repository.ResetAllUptimes()
 			for _, validatorID := range validatorIds {
 				go func(validatorID uint64) {
-					signedCount, err := s.Repository.GetSignedCountValidatorBlock(validatorID, height)
+					signedCount, err := s.Repository.GetFullSignedCountValidatorBlock(validatorID)
 					if err != nil {
 						s.logger.Error(errors.WithStack(err))
 						return
 					}
-					var uptime = 0.0
-					if signedCount > 12 {
-						uptime = float64(1-((24-signedCount)/12)) * 100
-					}
+
+					var uptime = math.Min(float64(signedCount)/float64(height), 100.0)
 					if err = s.Repository.UpdateValidatorUptime(validatorID, uptime); err != nil {
+						s.logger.Error(errors.WithStack(err))
+						return
+					}
+				}(validatorID)
+
+				go func(validatorID uint64) {
+					countDelegators, err := s.Repository.GetCountDelegators(validatorID)
+					if err != nil {
+						s.logger.Error(errors.WithStack(err))
+						return
+					}
+
+					if err = s.Repository.UpdateCountDelegators(validatorID, countDelegators); err != nil {
 						s.logger.Error(errors.WithStack(err))
 						return
 					}

@@ -185,6 +185,38 @@ func (r Repository) GetSignedCountValidatorBlock(validatorID uint64, blockEndID 
 	return count, nil
 }
 
+func (r Repository) GetFullSignedCountValidatorBlock(validatorID uint64) (uint64, error) {
+	var blockValidator models.BlockValidator
+	var count uint64
+
+	err := r.db.Model(&blockValidator).
+		ColumnExpr("COUNT(block_validator.signed)").
+		Join("LEFT JOIN validators AS v ON v.id = block_validator.validator_id").
+		Where("v.id = ?", validatorID).
+		Where("v.status = ?", models.ValidatorStatusReady).
+		Select(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r Repository) GetCountDelegators(validatorID uint64) (uint64, error) {
+	var stake models.Stake
+	var count uint64
+
+	err := r.db.Model(&stake).
+		ColumnExpr("COUNT(stake.id)").
+		Join("LEFT JOIN validators AS v").
+		JoinOn("v.id = stake.validator_id").
+		Where("v.id = ?", validatorID).
+		Select(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (r *Repository) UpdateValidatorUptime(validatorID uint64, uptime float64) error {
 	validator := models.Validator{Uptime: &uptime}
 	_, err := r.db.Model(&validator).Column("uptime").Where("id = ?", validatorID).Update()
@@ -193,3 +225,13 @@ func (r *Repository) UpdateValidatorUptime(validatorID uint64, uptime float64) e
 	}
 	return nil
 }
+
+func (r *Repository) UpdateCountDelegators(validatorID uint64, countDelegators uint64) error {
+	validator := models.Validator{CountDelegators: &countDelegators}
+	_, err := r.db.Model(&validator).Column("count_delegators").Where("id = ?", validatorID).Update()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+

@@ -617,7 +617,8 @@ CREATE TABLE public.validators
     description              text,
     meta_updated_at_block_id integer,
     created_at               timestamp with time zone DEFAULT now() NOT NULL,
-    uptime                   float                    default 0.0   NOT NULL
+    uptime                   float                    default 0.0   NOT NULL,
+    count_delegators         int8                     DEFAULT 0     NOT NULL
 );
 
 
