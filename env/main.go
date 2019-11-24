@@ -4,11 +4,11 @@ import (
 	"flag"
 	"os"
 
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 )
 
 func New() *models.ExtenderEnvironment {
-	appName := flag.String("app_name", "Noah Extender", "App name")
+	appName := flag.String("app_name", "Coin Extender", "App name")
 	baseCoin := flag.String("base_coin", "NOAH", "Base coin symbol")
 	coinsUpdateTime := flag.Int("coins_upd_time", 3600, "Coins update time in minutes")
 	txChunkSize := flag.Int("tx_chunk_size", 100, "Transactions chunk size")
@@ -38,8 +38,8 @@ func New() *models.ExtenderEnvironment {
 	envData.DbHost = os.Getenv("DB_HOST")
 	envData.DbPort = getEnvAsInt("DB_PORT", 5432)
 	envData.NodeApi = os.Getenv("NOAH_API_NODE")
-	envData.ApiHost = os.Getenv("EXTENDER_API_HOST")
-	envData.ApiPort = getEnvAsInt("EXTENDER_API_PORT", 8000)
+	envData.ApiHost = os.Getenv("COIN_EXTENDER_API_HOST")
+	envData.ApiPort = getEnvAsInt("COIN_EXTENDER_API_PORT", 10000)
 	envData.Debug = getEnvAsBool("DEBUG", true)
 	envData.WsHost = os.Getenv("WS_HOST")
 	envData.WsPort = getEnvAsInt("WS_PORT", 8000)

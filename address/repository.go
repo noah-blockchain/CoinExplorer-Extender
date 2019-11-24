@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/go-pg/pg"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 )
 
 type Repository struct {
@@ -110,6 +110,9 @@ func (r *Repository) SaveAllIfNotExist(addresses []string) error {
 	if err != nil {
 		r.addToCache(aList)
 	}
+
+	// TODO: Update coins creation
+
 	return err
 }
 

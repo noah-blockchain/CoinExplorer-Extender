@@ -1,24 +1,31 @@
 package validator
 
 import (
+	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"time"
 
-	"github.com/noah-blockchain/noah-explorer-extender/address"
-	"github.com/noah-blockchain/noah-explorer-extender/coin"
-	"github.com/noah-blockchain/noah-explorer-tools/helpers"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/CoinExplorer-Extender/address"
+	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
+	"github.com/noah-blockchain/CoinExplorer-Extender/utils"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	precision = 100
+)
+
 type Service struct {
 	env                 *models.ExtenderEnvironment
 	nodeApi             *noah_node_go_api.NoahNodeApi
-	repository          *Repository
+	Repository          *Repository
 	addressRepository   *address.Repository
 	coinRepository      *coin.Repository
 	jobUpdateValidators chan uint64
@@ -26,12 +33,12 @@ type Service struct {
 	logger              *logrus.Entry
 }
 
-func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
+func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, Repository *Repository,
 	addressRepository *address.Repository, coinRepository *coin.Repository, logger *logrus.Entry) *Service {
 	return &Service{
 		env:                 env,
 		nodeApi:             nodeApi,
-		repository:          repository,
+		Repository:          Repository,
 		addressRepository:   addressRepository,
 		coinRepository:      coinRepository,
 		logger:              logger,
@@ -58,7 +65,7 @@ func (s *Service) UpdateValidatorsWorker(jobs <-chan uint64) {
 		}
 
 		if resp.Error != nil {
-			s.logger.Errorf("UpdateValidatorsWorker error: message=%s and data=%s height=%d", resp.Error.Message, resp.Error.Data, height) // todo
+			//s.logger.Errorf("UpdateValidatorsWorker error: message=%s and data=%s height=%d", resp.Error.Message, resp.Error.Data, height) // todo
 			continue
 		}
 
@@ -75,7 +82,7 @@ func (s *Service) UpdateValidatorsWorker(jobs <-chan uint64) {
 				addressesMap[helpers.RemovePrefixFromAddress(vlr.OwnerAddress)] = struct{}{}
 			}
 
-			err = s.repository.SaveAllIfNotExist(validators)
+			err = s.Repository.SaveAllIfNotExist(validators)
 			if err != nil {
 				s.logger.Error(errors.WithStack(err))
 			}
@@ -90,7 +97,7 @@ func (s *Service) UpdateValidatorsWorker(jobs <-chan uint64) {
 				status := validator.Status
 				totalStake := validator.TotalStake
 
-				id, err := s.repository.FindIdByPkOrCreate(helpers.RemovePrefix(validator.PubKey))
+				id, err := s.Repository.FindIdByPkOrCreate(helpers.RemovePrefix(validator.PubKey))
 				if err != nil {
 					s.logger.Error(errors.WithStack(err))
 					continue
@@ -114,17 +121,17 @@ func (s *Service) UpdateValidatorsWorker(jobs <-chan uint64) {
 					ID:              id,
 					Status:          &status,
 					TotalStake:      &totalStake,
-					UpdateAt:        &updateAt,
+					UpdatedAt:       &updateAt,
 					Commission:      &commission,
 					RewardAddressID: &rewardAddressID,
 					OwnerAddressID:  &ownerAddressID,
 				}
 			}
-			err = s.repository.ResetAllStatuses()
+			err = s.Repository.ResetAllStatuses()
 			if err != nil {
 				s.logger.Error(errors.WithStack(err))
 			}
-			err = s.repository.UpdateAll(validators)
+			err = s.Repository.UpdateAll(validators)
 			if err != nil {
 				s.logger.Error(errors.WithStack(err))
 			}
@@ -147,6 +154,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 
 		var (
 			stakes       []*models.Stake
+			stakesInCoin = make(map[uint64]string)
 			validatorIds = make([]uint64, len(resp.Result))
 			validators   = make([]*models.Validator, len(resp.Result))
 			addressesMap = make(map[string]struct{})
@@ -162,7 +170,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 			}
 		}
 
-		err = s.repository.SaveAllIfNotExist(validators)
+		err = s.Repository.SaveAllIfNotExist(validators)
 		if err != nil {
 			s.logger.Error(errors.WithStack(err))
 		}
@@ -173,12 +181,13 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 		}
 
 		for i, vlr := range resp.Result {
-			id, err := s.repository.FindIdByPkOrCreate(helpers.RemovePrefix(vlr.PubKey))
+			id, err := s.Repository.FindIdByPkOrCreate(helpers.RemovePrefix(vlr.PubKey))
 			if err != nil {
 				s.logger.Error(errors.WithStack(err))
 				continue
 			}
 			validatorIds[i] = id
+
 			for _, stake := range vlr.Stakes {
 				ownerAddressID, err := s.addressRepository.FindIdOrCreate(helpers.RemovePrefixFromAddress(stake.Owner))
 				if err != nil {
@@ -195,8 +204,22 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 					OwnerAddressID: ownerAddressID,
 					CoinID:         coinID,
 					Value:          stake.Value,
-					NoahValue:      stake.Value,
+					NoahValue:      stake.NoahValue,
 				})
+
+				if stake.Coin == s.env.BaseCoin {
+					continue
+				}
+
+				v, ok := stakesInCoin[coinID]
+				if ok {
+					valueInt := utils.ConvertStringToBigInt(v)
+					stakeInt := utils.ConvertStringToBigInt(stake.Value)
+					valueInt.Add(valueInt, stakeInt)
+					stakesInCoin[coinID] = valueInt.String()
+				} else {
+					stakesInCoin[coinID] = stake.Value
+				}
 			}
 		}
 
@@ -207,7 +230,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 			if end > len(stakes) {
 				end = len(stakes)
 			}
-			err = s.repository.SaveAllStakes(stakes[start:end])
+			err = s.Repository.SaveAllStakes(stakes[start:end])
 			if err != nil {
 				s.logger.Error(errors.WithStack(err))
 				panic(err)
@@ -218,9 +241,72 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 		for i, stake := range stakes {
 			stakesId[i] = stake.ID
 		}
-		err = s.repository.DeleteStakesNotInListIds(stakesId)
-		if err != nil {
+		if err = s.Repository.DeleteStakesNotInListIds(stakesId); err != nil {
 			s.logger.Error(errors.WithStack(err))
+		}
+
+		coinsId := make([]uint64, len(stakesInCoin))
+		index := 0
+		for k, v := range stakesInCoin { // compute how much was delegated in literally coin into validators
+			coinsId[index] = k
+			index++
+
+			go func(coinID uint64, stake string) {
+				fmt.Println(fmt.Sprintf("coinID = %d stake = %s", coinID, stake))
+				currentCoin, err := s.coinRepository.FindCoinByID(coinID)
+				if err != nil {
+					s.logger.Error(errors.WithStack(err))
+					return
+				}
+
+				stakeFloat, _ := utils.NewFloat(0, precision).SetString(stake)
+				volumeFloat, _ := utils.NewFloat(0, precision).SetString(currentCoin.Volume)
+				stakeFloat.Quo(stakeFloat, volumeFloat)
+				stakeFloat.Mul(stakeFloat, big.NewFloat(100))
+				delegated, _ := stakeFloat.Uint64()
+
+				if err = s.coinRepository.UpdateCoinDelegation(coinID, utils.Min(delegated, 100)); err != nil {
+					s.logger.Error(errors.WithStack(err))
+					return
+				}
+			}(k, v)
+		}
+
+		if err = s.coinRepository.ResetCoinDelegationNotInListIds(coinsId); err != nil {
+			s.logger.Error(errors.WithStack(err))
+		}
+
+		if height%192 == 0 { //update uptime
+			_ = s.Repository.ResetAllUptimes()
+			for _, validatorID := range validatorIds {
+				go func(validatorID uint64) {
+					signedCount, err := s.Repository.GetFullSignedCountValidatorBlock(validatorID)
+					if err != nil {
+						s.logger.Error(errors.WithStack(err))
+						return
+					}
+
+					value := float64(signedCount)/float64(height)
+					var uptime = math.Min(value * 100, 100.0)
+					if err = s.Repository.UpdateValidatorUptime(validatorID, uptime); err != nil {
+						s.logger.Error(errors.WithStack(err))
+						return
+					}
+				}(validatorID)
+
+				go func(validatorID uint64) {
+					countDelegators, err := s.Repository.GetCountDelegators(validatorID)
+					if err != nil {
+						s.logger.Error(errors.WithStack(err))
+						return
+					}
+
+					if err = s.Repository.UpdateCountDelegators(validatorID, countDelegators); err != nil {
+						s.logger.Error(errors.WithStack(err))
+						return
+					}
+				}(validatorID)
+			}
 		}
 	}
 }
@@ -231,7 +317,7 @@ func (s *Service) HandleBlockResponse(response *responses.BlockResponse) ([]*mod
 	for _, v := range response.Result.Validators {
 		validators = append(validators, &models.Validator{PublicKey: helpers.RemovePrefix(v.PubKey)})
 	}
-	err := s.repository.SaveAllIfNotExist(validators)
+	err := s.Repository.SaveAllIfNotExist(validators)
 	if err != nil {
 		s.logger.Error(errors.WithStack(err))
 		return nil, err
@@ -268,14 +354,14 @@ func (s *Service) HandleCandidateResponse(response *responses.CandidateResponse)
 	}
 	validator.RewardAddressID = &rewardAddressID
 	validator.PublicKey = helpers.RemovePrefix(response.Result.PubKey)
-	validatorID, err := s.repository.FindIdByPk(validator.PublicKey)
+	validatorID, err := s.Repository.FindIdByPk(validator.PublicKey)
 	if err != nil {
 		s.logger.Error(errors.WithStack(err))
 		return nil, nil, err
 	}
 	validator.ID = validatorID
 	now := time.Now()
-	validator.UpdateAt = &now
+	validator.UpdatedAt = &now
 
 	stakes, err := s.GetStakesFromCandidateResponse(response)
 	if err != nil {
@@ -288,7 +374,7 @@ func (s *Service) HandleCandidateResponse(response *responses.CandidateResponse)
 
 func (s *Service) GetStakesFromCandidateResponse(response *responses.CandidateResponse) ([]*models.Stake, error) {
 	var stakes []*models.Stake
-	validatorID, err := s.repository.FindIdByPk(helpers.RemovePrefix(response.Result.PubKey))
+	validatorID, err := s.Repository.FindIdByPk(helpers.RemovePrefix(response.Result.PubKey))
 	if err != nil {
 		s.logger.Error(errors.WithStack(err))
 		return nil, err

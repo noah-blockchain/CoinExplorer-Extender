@@ -4,16 +4,16 @@
 
 FROM golang:1.12-buster as builder
 
-ENV APP_PATH /home/noah-extender
+ENV APP_PATH /home/coin_extender
 
 COPY . ${APP_PATH}
 
 WORKDIR ${APP_PATH}
 
-RUN make create_vendor && \
-    make build && \
-    cp ./builds/extender /usr/local/bin/extender
+RUN make create_vendor && make build
 
-EXPOSE 9000
-CMD ["extender"]
+FROM debian:buster-slim as executor
+COPY --from=builder /home/coin_extender/builds/coin_extender /usr/local/bin/coin_extender
+EXPOSE 10000
+CMD ["coin_extender"]
 STOPSIGNAL SIGTERM

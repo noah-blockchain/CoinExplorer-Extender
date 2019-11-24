@@ -2,7 +2,7 @@ package transaction
 
 import (
 	"github.com/go-pg/pg"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 )
 
 type Repository struct {
@@ -85,4 +85,13 @@ insert into index_transaction_by_address (block_id, address_id, transaction_id)
 ON CONFLICT DO NOTHING;
 	`, txsNumber, txsNumber)
 	return err
+}
+
+func (r *Repository) FindTransactionIdByHash(hash string) (uint64, error) {
+	tx := new(models.Transaction)
+	err := r.db.Model(tx).Column("id").Where("hash = ?", hash).Select(tx)
+	if err != nil {
+		return 0, err
+	}
+	return tx.ID, nil
 }

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/noah-blockchain/noah-explorer-extender/api"
-	"github.com/noah-blockchain/noah-explorer-extender/core"
-	"github.com/noah-blockchain/noah-explorer-extender/database/migrate"
-	"github.com/noah-blockchain/noah-explorer-extender/env"
+	"github.com/noah-blockchain/CoinExplorer-Extender/api"
+	"github.com/noah-blockchain/CoinExplorer-Extender/core"
+	"github.com/noah-blockchain/CoinExplorer-Extender/database/migrate"
+	"github.com/noah-blockchain/CoinExplorer-Extender/env"
 )
 
 func main() {
@@ -14,6 +14,7 @@ func main() {
 
 	extenderApi := api.New(envData.ApiHost, envData.ApiPort)
 	go extenderApi.Run()
+
 	ext := core.NewExtender(envData)
 	ext.Run()
 }

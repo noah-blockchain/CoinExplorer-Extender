@@ -2,14 +2,18 @@ package coin
 
 import (
 	"errors"
-	"github.com/noah-blockchain/noah-explorer-extender/address"
-	"github.com/noah-blockchain/noah-explorer-tools/helpers"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/dgraph-io/badger"
+	"github.com/noah-blockchain/CoinExplorer-Extender/address"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
+	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
-	"strconv"
-	"time"
 )
 
 type Service struct {
@@ -20,10 +24,12 @@ type Service struct {
 	logger                *logrus.Entry
 	jobUpdateCoins        chan []*models.Transaction
 	jobUpdateCoinsFromMap chan map[string]struct{}
+	dbCoinWorker          *badger.DB
 }
 
 func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
-	addressRepository *address.Repository, logger *logrus.Entry) *Service {
+	addressRepository *address.Repository, logger *logrus.Entry, dbCoinWorker *badger.DB) *Service {
+
 	return &Service{
 		env:                   env,
 		nodeApi:               nodeApi,
@@ -32,6 +38,7 @@ func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahN
 		logger:                logger,
 		jobUpdateCoins:        make(chan []*models.Transaction, 1),
 		jobUpdateCoinsFromMap: make(chan map[string]struct{}, 1),
+		dbCoinWorker:          dbCoinWorker,
 	}
 }
 
@@ -55,6 +62,11 @@ func (s Service) ExtractCoinsFromTransactions(transactions []responses.Transacti
 	var coins []*models.Coin
 	for _, tx := range transactions {
 		if tx.Type == models.TxTypeCreateCoin {
+			if tx.Log != nil { // protection. Coin maybe not created in blockchain
+				s.logger.Error(*tx.Log)
+				continue
+			}
+
 			coin, err := s.ExtractFromTx(tx)
 			if err != nil {
 				s.logger.Error(err)
@@ -71,7 +83,7 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		s.logger.Warn("empty transaction data")
 		return nil, errors.New("no data for creating a coin")
 	}
-	txData := tx.IData.(models.CreateCoinTxData)
+	txData := tx.IData.(node_models.CreateCoinTxData)
 
 	crr, err := strconv.ParseUint(txData.ConstantReserveRatio, 10, 64)
 	if err != nil {
@@ -80,20 +92,30 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 	}
 
 	coin := &models.Coin{
-		Crr:            crr,
-		Volume:         txData.InitialAmount,
-		ReserveBalance: txData.InitialReserve,
-		Name:           txData.Name,
-		Symbol:         txData.Symbol,
-		DeletedAt:      nil,
+		Crr:                 crr,
+		Volume:              txData.InitialAmount,
+		ReserveBalance:      txData.InitialReserve,
+		Name:                txData.Name,
+		Symbol:              txData.Symbol,
+		DeletedAt:           nil,
+		Price:               GetTokenPrice(txData.InitialAmount, txData.InitialReserve, crr),
+		StartVolume:         txData.InitialAmount,
+		StartReserveBalance: txData.InitialReserve,
 	}
+	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
+	coin.StartPrice = coin.Price
 
-	fromId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(tx.From))
-	if err != nil {
-		s.logger.Error(err)
-	} else {
-		coin.CreationAddressID = &fromId
-	}
+	addressKey := fmt.Sprintf("address_%s_%s", coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
+	err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
+		return txn.Set([]byte(addressKey), []byte("active"))
+	})
+	s.logger.Error(err)
+
+	trxKey := fmt.Sprintf("trx_%s_%s", coin.Symbol, helpers.RemovePrefix(tx.Hash))
+	err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
+		return txn.Set([]byte(trxKey), []byte("active"))
+	})
+	s.logger.Error(err)
 
 	return coin, nil
 }
@@ -119,14 +141,14 @@ func (s *Service) UpdateCoinsInfoFromTxsWorker(jobs <-chan []*models.Transaction
 			coinsMap[symbol] = struct{}{}
 			switch tx.Type {
 			case models.TxTypeSellCoin:
-				coinsMap[tx.IData.(models.SellCoinTxData).CoinToBuy] = struct{}{}
-				coinsMap[tx.IData.(models.SellCoinTxData).CoinToSell] = struct{}{}
+				coinsMap[tx.IData.(node_models.SellCoinTxData).CoinToBuy] = struct{}{}
+				coinsMap[tx.IData.(node_models.SellCoinTxData).CoinToSell] = struct{}{}
 			case models.TxTypeBuyCoin:
-				coinsMap[tx.IData.(models.BuyCoinTxData).CoinToBuy] = struct{}{}
-				coinsMap[tx.IData.(models.BuyCoinTxData).CoinToSell] = struct{}{}
+				coinsMap[tx.IData.(node_models.BuyCoinTxData).CoinToBuy] = struct{}{}
+				coinsMap[tx.IData.(node_models.BuyCoinTxData).CoinToSell] = struct{}{}
 			case models.TxTypeSellAllCoin:
-				coinsMap[tx.IData.(models.SellAllCoinTxData).CoinToBuy] = struct{}{}
-				coinsMap[tx.IData.(models.SellAllCoinTxData).CoinToSell] = struct{}{}
+				coinsMap[tx.IData.(node_models.SellAllCoinTxData).CoinToBuy] = struct{}{}
+				coinsMap[tx.IData.(node_models.SellAllCoinTxData).CoinToSell] = struct{}{}
 			}
 		}
 		s.GetUpdateCoinsFromCoinsMapJobChannel() <- coinsMap
@@ -199,5 +221,22 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.Volume = coinResp.Result.Volume
 	coin.DeletedAt = nil
 	coin.UpdatedAt = now
+	coin.Price = GetTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
+	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
+
 	return coin, nil
+}
+
+func (s *Service) UpdateCoinTransaction(symbol string, creationTransactionID uint64) error {
+	if err := s.repository.UpdateCoinTransaction(symbol, creationTransactionID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) UpdateCoinOwner(symbol string, creationAddressID uint64) error {
+	if err := s.repository.UpdateCoinOwner(symbol, creationAddressID); err != nil {
+		return err
+	}
+	return nil
 }

@@ -5,28 +5,33 @@ import (
 	"math"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/dgraph-io/badger"
 	"github.com/go-pg/pg"
-	"github.com/noah-blockchain/noah-explorer-extender/address"
-	"github.com/noah-blockchain/noah-explorer-extender/balance"
-	"github.com/noah-blockchain/noah-explorer-extender/block"
-	"github.com/noah-blockchain/noah-explorer-extender/broadcast"
-	"github.com/noah-blockchain/noah-explorer-extender/coin"
-	"github.com/noah-blockchain/noah-explorer-extender/events"
-	"github.com/noah-blockchain/noah-explorer-extender/transaction"
-	"github.com/noah-blockchain/noah-explorer-extender/validator"
-	"github.com/noah-blockchain/noah-explorer-tools/helpers"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/CoinExplorer-Extender/address"
+	"github.com/noah-blockchain/CoinExplorer-Extender/balance"
+	"github.com/noah-blockchain/CoinExplorer-Extender/block"
+	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
+	"github.com/noah-blockchain/CoinExplorer-Extender/events"
+	"github.com/noah-blockchain/CoinExplorer-Extender/transaction"
+	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
 )
 
-const ChasingModDiff = 2
+const (
+	ChasingModDiff = 2
 
-//const fallbackCount = 5
-//const fallbackTimeout = 5 * time.Second
+	badgerFolder = "db/badger"
+
+	fallbackCount   = 10
+	fallbackTimeout = 15 * time.Second
+)
 
 type Extender struct {
 	env                 *models.ExtenderEnvironment
@@ -43,6 +48,7 @@ type Extender struct {
 	chasingMode         bool
 	currentNodeHeight   uint64
 	logger              *logrus.Entry
+	dbCoinWorker        *badger.DB
 }
 
 type dbLogger struct {
@@ -74,7 +80,7 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 
 	contextLogger := logger.WithFields(logrus.Fields{
 		"version": "2.1.0",
-		"app":     "Noah Explorer Extender",
+		"app":     "Coin Explorer Extender",
 	})
 
 	//Init DB
@@ -93,8 +99,7 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 		db.AddQueryHook(dbLogger{logger: contextLogger})
 	}
 	//api
-	//nodeApi := noah_node_go_api.NewWithFallbackRetries(env.NodeApi, fallbackCount, fallbackTimeout)
-	nodeApi := noah_node_go_api.New(env.NodeApi)
+	nodeApi := noah_node_go_api.NewWithFallbackRetries(env.NodeApi, fallbackCount, fallbackTimeout)
 
 	// Repositories
 	blockRepository := block.NewRepository(db)
@@ -106,18 +111,24 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 	balanceRepository := balance.NewRepository(db)
 
 	// Services
-	broadcastService := broadcast.NewService(env, addressRepository, coinRepository, contextLogger)
-	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger)
-	balanceService := balance.NewService(env, balanceRepository, nodeApi, addressRepository, coinRepository, broadcastService, contextLogger)
+	balanceService := balance.NewService(env, balanceRepository, nodeApi, addressRepository, coinRepository, contextLogger)
 
+	if err := os.MkdirAll(badgerFolder, 0774); err != nil {
+		logger.Panicln(err)
+	}
+	dbCoinWorker, err := badger.Open(badger.DefaultOptions(badgerFolder))
+	if err != nil {
+		logger.Panicln(err)
+	}
+	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger, dbCoinWorker)
 	return &Extender{
 		env:                 env,
 		nodeApi:             nodeApi,
-		blockService:        block.NewBlockService(blockRepository, validatorRepository, broadcastService),
+		blockService:        block.NewBlockService(blockRepository, validatorRepository),
 		eventService:        events.NewService(env, eventsRepository, validatorRepository, addressRepository, coinRepository, coinService, balanceRepository, contextLogger),
 		blockRepository:     blockRepository,
 		validatorService:    validator.NewService(env, nodeApi, validatorRepository, addressRepository, coinRepository, contextLogger),
-		transactionService:  transaction.NewService(env, transactionRepository, addressRepository, validatorRepository, coinRepository, coinService, broadcastService, contextLogger),
+		transactionService:  transaction.NewService(env, transactionRepository, addressRepository, validatorRepository, coinRepository, coinService, contextLogger),
 		addressService:      address.NewService(env, addressRepository, balanceService.GetAddressesChannel(), contextLogger),
 		validatorRepository: validatorRepository,
 		balanceService:      balanceService,
@@ -125,10 +136,74 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 		chasingMode:         true,
 		currentNodeHeight:   0,
 		logger:              contextLogger,
+		dbCoinWorker:        dbCoinWorker,
+	}
+}
+
+func (ext *Extender) coinWorker() {
+	for {
+
+		err := ext.dbCoinWorker.Update(func(txn *badger.Txn) error {
+			opts := badger.DefaultIteratorOptions
+			opts.PrefetchValues = false
+			it := txn.NewIterator(opts)
+			defer it.Close()
+			for it.Rewind(); it.Valid(); it.Next() {
+				item := it.Item()
+				k := item.Key()
+				ext.logger.Println("KEY ", string(k))
+
+				s := strings.Split(string(k), "_") // (trx/address)_symbol_(hash/addr)
+				if len(s) != 3 {
+					_ = txn.Delete(k)
+					continue
+				}
+				command := s[0]
+				symbol := s[1]
+				value := s[2]
+
+				if command == "address" {
+					addrID, err := ext.addressService.FindId(value)
+					if err != nil {
+						ext.logger.Error(err)
+						continue
+					}
+
+					if err = ext.coinService.UpdateCoinOwner(symbol, addrID); err != nil {
+						ext.logger.Error(err)
+						continue
+					}
+				} else if command == "trx" {
+					trxID, err := ext.transactionService.FindTransactionIdByHash(value)
+					if err != nil {
+						ext.logger.Error(err)
+						continue
+					}
+
+					if err = ext.coinService.UpdateCoinTransaction(symbol, trxID); err != nil {
+						ext.logger.Error(err)
+						continue
+					}
+				}
+
+				if err := txn.Delete(k); err != nil {
+					ext.logger.Panicln(err)
+				}
+			}
+			return nil
+		})
+
+		if err != nil {
+			ext.logger.Error(err)
+		}
+
+		ext.logger.Println("Coin Worker. New attempt")
+		time.Sleep(15 * time.Second)
 	}
 }
 
 func (ext *Extender) Run() {
+
 	//check connections to node
 	_, err := ext.nodeApi.GetStatus()
 	if err == nil {
@@ -153,6 +228,7 @@ func (ext *Extender) Run() {
 	}
 
 	for {
+
 		start := time.Now()
 		ext.findOutChasingMode(height)
 		//Pulling block data
@@ -170,9 +246,9 @@ func (ext *Extender) Run() {
 		}
 		helpers.HandleError(err)
 
-		ext.handleCoinsFromTransactions(blockResponse.Result.Transactions)
 		ext.handleAddressesFromResponses(blockResponse, eventsResponse)
 		ext.handleBlockResponse(blockResponse)
+		ext.handleCoinsFromTransactions(blockResponse.Result.Transactions)
 
 		if height%uint64(ext.env.RewardAggregateEveryBlocksCount) == 0 {
 			go ext.eventService.AggregateRewards(ext.env.RewardAggregateTimeInterval, height)
@@ -209,7 +285,10 @@ func (ext *Extender) runWorkers() {
 	for w := 1; w <= ext.env.WrkSaveValidatorTxsCount; w++ {
 		go ext.transactionService.SaveTxValidatorWorker(ext.transactionService.GetSaveTxValidatorJobChannel())
 	}
+	//обновляет награды валидаторов
 	go ext.validatorService.UpdateValidatorsWorker(ext.validatorService.GetUpdateValidatorsJobChannel())
+
+	//обновляет стейки валидаторов
 	go ext.validatorService.UpdateStakesWorker(ext.validatorService.GetUpdateStakesJobChannel())
 
 	// Events
@@ -232,6 +311,7 @@ func (ext *Extender) runWorkers() {
 	//Coins
 	go ext.coinService.UpdateCoinsInfoFromTxsWorker(ext.coinService.GetUpdateCoinsFromTxsJobChannel())
 	go ext.coinService.UpdateCoinsInfoFromCoinsMap(ext.coinService.GetUpdateCoinsFromCoinsMapJobChannel())
+	go ext.coinWorker()
 }
 
 func (ext *Extender) handleAddressesFromResponses(blockResponse *responses.BlockResponse, eventsResponse *responses.EventsResponse) {

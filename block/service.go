@@ -1,11 +1,11 @@
 package block
 
 import (
-	"github.com/noah-blockchain/noah-explorer-extender/broadcast"
-	"github.com/noah-blockchain/noah-explorer-extender/validator"
-	"github.com/noah-blockchain/noah-explorer-tools/helpers"
-	"github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
+	"math"
 	"strconv"
 	"time"
 )
@@ -13,15 +13,13 @@ import (
 type Service struct {
 	blockRepository     *Repository
 	validatorRepository *validator.Repository
-	broadcastService    *broadcast.Service
 	blockCache          *models.Block //Contain previous block model
 }
 
-func NewBlockService(blockRepository *Repository, validatorRepository *validator.Repository, broadcastService *broadcast.Service) *Service {
+func NewBlockService(blockRepository *Repository, validatorRepository *validator.Repository) *Service {
 	return &Service{
 		blockRepository:     blockRepository,
 		validatorRepository: validatorRepository,
-		broadcastService:    broadcastService,
 	}
 }
 
@@ -52,20 +50,23 @@ func (s *Service) HandleBlockResponse(response *responses.BlockResponse) error {
 		proposerId = 1
 	}
 
+	blockTime := s.getBlockTime(response.Result.Time)
+	if blockTime >= math.MaxInt64 {
+		blockTime = math.MaxInt64 - 1
+	}
+
 	block := &models.Block{
 		ID:                  height,
 		TotalTxs:            totalTx,
 		NumTxs:              uint32(numTx),
 		Size:                size,
-		BlockTime:           s.getBlockTime(response.Result.Time),
+		BlockTime:           blockTime,
 		CreatedAt:           response.Result.Time,
 		BlockReward:         response.Result.BlockReward,
 		ProposerValidatorID: proposerId,
 		Hash:                response.Result.Hash,
 	}
 	s.SetBlockCache(block)
-
-	go s.broadcastService.PublishBlock(block)
 
 	return s.blockRepository.Save(block)
 }
