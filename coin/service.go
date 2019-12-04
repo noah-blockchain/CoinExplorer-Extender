@@ -58,6 +58,15 @@ func (s *Service) GetUpdateCoinsFromCoinsMapJobChannel() chan map[string]struct{
 	return s.jobUpdateCoinsFromMap
 }
 
+func AppendIfMissing(slice []*models.Coin, c *models.Coin) []*models.Coin {
+	for _, ele := range slice {
+		if ele.Symbol == c.Symbol {
+			return slice
+		}
+	}
+	return append(slice, c)
+}
+
 func (s Service) ExtractCoinsFromTransactions(transactions []responses.Transaction) ([]*models.Coin, error) {
 	var coins []*models.Coin
 	for _, tx := range transactions {
@@ -75,7 +84,7 @@ func (s Service) ExtractCoinsFromTransactions(transactions []responses.Transacti
 			s.logger.Error(err)
 			return nil, err
 		}
-		coins = append(coins, coin)
+		coins = AppendIfMissing(coins, coin)
 	}
 	return coins, nil
 }
