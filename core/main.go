@@ -228,7 +228,6 @@ func (ext *Extender) Run() {
 	}
 
 	for {
-
 		start := time.Now()
 		ext.findOutChasingMode(height)
 		//Pulling block data
@@ -360,19 +359,24 @@ func (ext *Extender) handleBlockResponse(response *responses.BlockResponse) {
 }
 
 func (ext *Extender) handleCoinsFromTransactions(transactions []responses.Transaction) {
-	if len(transactions) > 0 {
-		coins, err := ext.coinService.ExtractCoinsFromTransactions(transactions)
-		if err != nil {
-			ext.logger.Error(err)
-			helpers.HandleError(err)
-		}
-		if len(coins) > 0 {
-			err = ext.coinService.CreateNewCoins(coins)
-			if err != nil {
-				ext.logger.Error(err)
-				helpers.HandleError(err)
-			}
-		}
+	if len(transactions) == 0 {
+		return
+	}
+
+	coins, err := ext.coinService.ExtractCoinsFromTransactions(transactions)
+	if err != nil {
+		ext.logger.Error(err)
+		helpers.HandleError(err)
+	}
+
+	if len(coins) == 0 {
+		return
+	}
+
+	err = ext.coinService.CreateNewCoins(coins)
+	if err != nil {
+		ext.logger.Error(err)
+		helpers.HandleError(err)
 	}
 }
 
