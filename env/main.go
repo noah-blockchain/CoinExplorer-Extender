@@ -44,6 +44,8 @@ func New() *models.ExtenderEnvironment {
 	envData.WsHost = os.Getenv("WS_HOST")
 	envData.WsPort = getEnvAsInt("WS_PORT", 8000)
 	envData.WsKey = os.Getenv("WS_API_KEY")
+	envData.NatsAddr = os.Getenv("NATS_ADDR")
+	envData.NatsClusterID = os.Getenv("NATS_CLUSTER_ID")
 
 	envData.AppName = *appName
 	envData.DbMinIdleConns = 10

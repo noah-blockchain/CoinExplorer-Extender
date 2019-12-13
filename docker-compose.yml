@@ -2,16 +2,35 @@ version: '3.6'
 
 volumes:
   app-db-data2:
+  nats_streaming_1_noah:
 
 services:
   db:
     image: postgres:9.5.14
     restart: always
     ports:
-      - 5432:5432
+      - "54320:5432"
     environment:
       POSTGRES_DB: coin_explorer
       POSTGRES_USER: noah
       POSTGRES_PASSWORD: password
     volumes:
       - app-db-data2:/var/lib/postgresql/data
+
+  nats-1:
+    image: "nats:2"
+    ports:
+      - 4222:4222
+      - 6222:6222
+      - 8222:8222
+
+  nats-streaming-1:
+    image: "nats-streaming:0.16.2-linux"
+    command: >
+      -store file -dir /data_node -max_msgs 0 -max_bytes 0 -cluster_id event -cluster_log_path /data_node/logs
+      -cluster_peers node_1
+      -nats_server nats://nats-1:4222
+    depends_on:
+      - nats-1
+    volumes:
+      - nats_streaming_1_noah:/data_node

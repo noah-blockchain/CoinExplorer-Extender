@@ -1,18 +1,22 @@
 package coin
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/dgraph-io/badger"
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/nats-io/stan.go"
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
+	coin_extender "github.com/noah-blockchain/coinExplorer-tools"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,10 +29,11 @@ type Service struct {
 	jobUpdateCoins        chan []*models.Transaction
 	jobUpdateCoinsFromMap chan map[string]struct{}
 	dbCoinWorker          *badger.DB
+	natsStream            stan.Conn
 }
 
 func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
-	addressRepository *address.Repository, logger *logrus.Entry, dbCoinWorker *badger.DB) *Service {
+	addressRepository *address.Repository, logger *logrus.Entry, dbCoinWorker *badger.DB, natsStream stan.Conn) *Service {
 
 	return &Service{
 		env:                   env,
@@ -39,6 +44,7 @@ func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahN
 		jobUpdateCoins:        make(chan []*models.Transaction, 1),
 		jobUpdateCoinsFromMap: make(chan map[string]struct{}, 1),
 		dbCoinWorker:          dbCoinWorker,
+		natsStream:            natsStream,
 	}
 }
 
@@ -137,6 +143,14 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 		s.logger.Error(err)
 	}(coin.Symbol, helpers.RemovePrefix(tx.Hash))
 
+	go s.eventCoinMessage(&coin_extender.Coin{
+		Symbol:         coin.Symbol,
+		Price:          coin.Price,
+		Capitalization: coin.Capitalization,
+		ReserveBalance: coin.ReserveBalance,
+		Volume:         coin.Volume,
+		CreatedAt:      ptypes.TimestampNow(),
+	})
 	return coin, nil
 }
 
@@ -244,6 +258,15 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.Price = GetTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
+	go s.eventCoinMessage(&coin_extender.Coin{
+		Symbol:         coin.Symbol,
+		Price:          coin.Price,
+		Capitalization: coin.Capitalization,
+		ReserveBalance: coin.ReserveBalance,
+		Volume:         coin.Volume,
+		CreatedAt:      ptypes.TimestampNow(),
+	})
+
 	return coin, nil
 }
 
@@ -259,4 +282,13 @@ func (s *Service) UpdateCoinOwner(symbol string, creationAddressID uint64) error
 		return err
 	}
 	return nil
+}
+
+func (s *Service) eventCoinMessage(coin *coin_extender.Coin) {
+	data, _ := proto.Marshal(coin)
+
+	err := s.natsStream.Publish(helpers.CoinCreatedSubject, data)
+	if err != nil {
+		s.logger.Error(errors.WithStack(err))
+	}
 }

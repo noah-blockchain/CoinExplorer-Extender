@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"strconv"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/dgraph-io/badger"
 	"github.com/go-pg/pg"
+	"github.com/google/uuid"
+	"github.com/nats-io/stan.go"
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
 	"github.com/noah-blockchain/CoinExplorer-Extender/balance"
 	"github.com/noah-blockchain/CoinExplorer-Extender/block"
@@ -120,7 +123,21 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 	if err != nil {
 		logger.Panicln(err)
 	}
-	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger, dbCoinWorker)
+	natsStream, err := stan.Connect(
+		env.NatsClusterID,
+		uuid.New().String(),
+		stan.NatsURL(env.NatsAddr),
+		stan.Pings(5, 15),
+		stan.SetConnectionLostHandler(func(con stan.Conn, reason error) {
+			log.Panicln("Connection lost, reason: %v", reason)
+		}),
+	)
+	if err != nil {
+		logger.Panicln(err)
+	}
+
+	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger, dbCoinWorker, natsStream)
+
 	return &Extender{
 		env:                 env,
 		nodeApi:             nodeApi,
