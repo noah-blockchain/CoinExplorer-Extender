@@ -2,6 +2,7 @@ version: '3.6'
 
 volumes:
   app-db-data2:
+  app-db-data3:
   nats_streaming_1_noah:
 
 services:
@@ -17,6 +18,18 @@ services:
     volumes:
       - app-db-data2:/var/lib/postgresql/data
 
+  db-new:
+    image: postgres:11.6
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: coin_explorer_new
+      POSTGRES_USER: noah
+      POSTGRES_PASSWORD: password
+    volumes:
+      - app-db-data3:/var/lib/postgresql/data
+
   nats-1:
     image: "nats:2"
     ports:
@@ -27,7 +40,7 @@ services:
   nats-streaming-1:
     image: "nats-streaming:0.16.2-linux"
     command: >
-      -store file -dir /data_node -max_msgs 0 -max_bytes 0 -cluster_id event -cluster_log_path /data_node/logs
+      -store memory -max_msgs 0 -max_bytes 0 -cluster_id event -cluster_log_path /data_node/logs
       -cluster_peers node_1
       -nats_server nats://nats-1:4222
     depends_on:

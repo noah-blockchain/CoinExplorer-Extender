@@ -1,36 +1,39 @@
 package migrate
 
 import (
-	"fmt"
-	"github.com/go-pg/migrations"
-	"github.com/go-pg/pg"
-	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"log"
+
+	"database/sql"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
 )
 
 // Migrate runs go-pg migrations
 func Migrate(env *models.ExtenderEnvironment) {
-	db := pg.Connect(&pg.Options{
-		Addr:            fmt.Sprintf("%s:%d", env.DbHost, env.DbPort),
-		User:            env.DbUser,
-		Password:        env.DbPassword,
-		Database:        env.DbName,
-		ApplicationName: env.AppName,
-		MinIdleConns:    env.DbMinIdleConns,
-		PoolSize:        env.DbPoolSize,
-		MaxRetries:      10,
-	})
-	defer db.Close()
-
-	oldVersion, newVersion, err := migrations.Run(db, "up")
-	if err != nil {
-		log.Println(err.Error())
-	}
-	if newVersion != oldVersion {
-		fmt.Printf("migrated from version %d to %d\n", oldVersion, newVersion)
-	} else {
-		fmt.Printf("version is %d\n", oldVersion)
-	}
+	//db := pg.Connect(&pg.Options{
+	//	Addr:            fmt.Sprintf("%s:%d", env.DbHost, env.DbPort),
+	//	User:            env.DbUser,
+	//	Password:        env.DbPassword,
+	//	Database:        env.DbName,
+	//	ApplicationName: env.AppName,
+	//	MinIdleConns:    env.DbMinIdleConns,
+	//	PoolSize:        env.DbPoolSize,
+	//	MaxRetries:      10,
+	//})
+	//defer db.Close()
+	//
+	//oldVersion, newVersion, err := migrations.Run(db, "up")
+	//if err != nil {
+	//	log.Println(err.Error())
+	//}
+	//if newVersion != oldVersion {
+	//	fmt.Printf("migrated from version %d to %d\n", oldVersion, newVersion)
+	//} else {
+	//	fmt.Printf("version is %d\n", oldVersion)
+	//}
 
 	//err := db.RunInTransaction(func(tx *pg.Tx) error {
 	//	oldVersion, newVersion, err := migrations.Run(db, "init")
@@ -60,7 +63,10 @@ func Migrate(env *models.ExtenderEnvironment) {
 	//	return nil
 	//})
 
-	if err != nil {
-		log.Println(err)
-	}
+	//if err != nil {
+	//	log.Println(err)
+	//}
+
+
 }
+
