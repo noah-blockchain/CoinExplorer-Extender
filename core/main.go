@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"strconv"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/dgraph-io/badger"
 	"github.com/go-pg/pg"
+	"github.com/google/uuid"
+	"github.com/nats-io/stan.go"
 	"github.com/noah-blockchain/CoinExplorer-Extender/address"
 	"github.com/noah-blockchain/CoinExplorer-Extender/balance"
 	"github.com/noah-blockchain/CoinExplorer-Extender/block"
@@ -120,7 +123,21 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 	if err != nil {
 		logger.Panicln(err)
 	}
-	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger, dbCoinWorker)
+	natsStream, err := stan.Connect(
+		env.NatsClusterID,
+		uuid.New().String(),
+		stan.NatsURL(env.NatsAddr),
+		stan.Pings(5, 15),
+		stan.SetConnectionLostHandler(func(con stan.Conn, reason error) {
+			log.Panicln("Connection lost, reason: %v", reason)
+		}),
+	)
+	if err != nil {
+		logger.Panicln(err)
+	}
+
+	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger, dbCoinWorker, natsStream)
+
 	return &Extender{
 		env:                 env,
 		nodeApi:             nodeApi,
@@ -228,7 +245,6 @@ func (ext *Extender) Run() {
 	}
 
 	for {
-
 		start := time.Now()
 		ext.findOutChasingMode(height)
 		//Pulling block data
@@ -360,19 +376,24 @@ func (ext *Extender) handleBlockResponse(response *responses.BlockResponse) {
 }
 
 func (ext *Extender) handleCoinsFromTransactions(transactions []responses.Transaction) {
-	if len(transactions) > 0 {
-		coins, err := ext.coinService.ExtractCoinsFromTransactions(transactions)
-		if err != nil {
-			ext.logger.Error(err)
-			helpers.HandleError(err)
-		}
-		if len(coins) > 0 {
-			err = ext.coinService.CreateNewCoins(coins)
-			if err != nil {
-				ext.logger.Error(err)
-				helpers.HandleError(err)
-			}
-		}
+	if len(transactions) == 0 {
+		return
+	}
+
+	coins, err := ext.coinService.ExtractCoinsFromTransactions(transactions)
+	if err != nil {
+		ext.logger.Error(err)
+		helpers.HandleError(err)
+	}
+
+	if len(coins) == 0 {
+		return
+	}
+
+	err = ext.coinService.CreateNewCoins(coins)
+	if err != nil {
+		ext.logger.Error(err)
+		helpers.HandleError(err)
 	}
 }
 
