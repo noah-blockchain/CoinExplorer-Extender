@@ -9,7 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/nats-io/stan.go"
-	"github.com/noah-blockchain/CoinExplorer-Extender/address"
+	"github.com/noah-blockchain/CoinExplorer-Extender/internal/address"
 	coin_extender "github.com/noah-blockchain/coinExplorer-tools"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/noah-blockchain/CoinExplorer-Extender/address"
-	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
-	"github.com/noah-blockchain/CoinExplorer-Extender/utils"
+	"github.com/noah-blockchain/CoinExplorer-Extender/internal/address"
+	"github.com/noah-blockchain/CoinExplorer-Extender/internal/coin"
+	"github.com/noah-blockchain/CoinExplorer-Extender/internal/utils"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	"github.com/noah-blockchain/noah-node-go-api"

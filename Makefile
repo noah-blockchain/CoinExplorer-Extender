@@ -21,10 +21,10 @@ create_vendor:
 
 ### Build ###################
 build:
-	GOOS=${GOOS} go build -ldflags $(BUILD_FLAGS) -o ./builds/$(APP)
+	GOOS=${GOOS} go build -ldflags $(BUILD_FLAGS) -o ./build/$(APP) -i ./cmd/coin-extender
 
 install:
-	GOOS=${GOOS} go install -ldflags $(BUILD_FLAGS)
+	GOOS=${GOOS} go install -ldflags $(BUILD_FLAGS) -i ./cmd/coin-extender
 
 clean:
 	@rm -f $(BINARY)

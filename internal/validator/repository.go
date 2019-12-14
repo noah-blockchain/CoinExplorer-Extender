@@ -1,9 +1,10 @@
 package validator
 
 import (
+	"sync"
+
 	"github.com/go-pg/pg"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
-	"sync"
 )
 
 type Repository struct {
