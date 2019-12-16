@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/address"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/coin"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/utils"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/address"
+	"github.com/noah-blockchain/noah-extender/internal/coin"
+	"github.com/noah-blockchain/noah-extender/internal/utils"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/pkg/errors"
@@ -286,8 +286,8 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 						return
 					}
 
-					value := float64(signedCount)/float64(height)
-					var uptime = math.Min(value * 100, 100.0)
+					value := float64(signedCount) / float64(height)
+					var uptime = math.Min(value*100, 100.0)
 					if err = s.Repository.UpdateValidatorUptime(validatorID, uptime); err != nil {
 						s.logger.Error(errors.WithStack(err))
 						return

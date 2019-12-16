@@ -163,28 +163,6 @@ func (r Repository) ResetAllUptimes() error {
 	_, err := r.db.Query(nil, `update validators set uptime = 0.0;`)
 	return err
 }
-func (r Repository) GetSignedCountValidatorBlock(validatorID uint64, blockEndID uint64) (int64, error) {
-	var blockValidator models.BlockValidator
-	var count int64
-
-	blockStartID := blockEndID - 24
-	if blockStartID <= 0 {
-		blockStartID = 1
-	}
-
-	err := r.db.Model(&blockValidator).
-		ColumnExpr("COUNT(block_validator.signed)").
-		Join("LEFT JOIN validators AS v ON v.id = block_validator.validator_id").
-		Where("v.id = ?", validatorID).
-		Where("v.status = ?", models.ValidatorStatusReady).
-		Where("block_validator.block_id >= ?", blockStartID).
-		Where("block_validator.block_id < ?", blockEndID).
-		Select(&count)
-	if err != nil {
-		return 0, err
-	}
-	return count, nil
-}
 
 func (r Repository) GetFullSignedCountValidatorBlock(validatorID uint64) (uint64, error) {
 	var blockValidator models.BlockValidator
@@ -235,4 +213,3 @@ func (r *Repository) UpdateCountDelegators(validatorID uint64, countDelegators u
 	}
 	return nil
 }
-

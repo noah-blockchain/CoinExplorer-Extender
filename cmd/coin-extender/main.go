@@ -8,10 +8,10 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/api"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/core"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/env"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/api"
+	"github.com/noah-blockchain/noah-extender/internal/core"
+	"github.com/noah-blockchain/noah-extender/internal/env"
 )
 
 func main() {

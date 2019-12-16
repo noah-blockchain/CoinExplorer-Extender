@@ -4,10 +4,10 @@ import (
 	"math"
 	"sync"
 
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/address"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/coin"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/address"
+	"github.com/noah-blockchain/noah-extender/internal/coin"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"

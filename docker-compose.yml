@@ -1,34 +1,21 @@
 version: '3.6'
 
 volumes:
-  app-db-data2:
-  app-db-data4:
-  nats_streaming_1_noah:
+  app-db-data:
+  nats_streaming_1:
 
 services:
   db:
-    image: postgres:9.5.14
-    restart: always
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: coin_explorer
-      POSTGRES_USER: noah
-      POSTGRES_PASSWORD: password
-    volumes:
-      - app-db-data2:/var/lib/postgresql/data
-
-  db-new:
     image: postgres:11.6
     restart: always
     ports:
-      - "5432:5432"
+      - 5432:5432
     environment:
       POSTGRES_DB: coin_explorer_new
       POSTGRES_USER: noah
       POSTGRES_PASSWORD: password
     volumes:
-      - app-db-data4:/var/lib/postgresql/data
+      - app-db-data:/var/lib/postgresql/data
 
   nats-1:
     image: "nats:2"
@@ -46,7 +33,7 @@ services:
     depends_on:
       - nats-1
     volumes:
-      - nats_streaming_1_noah:/data_node
+      - nats_streaming_1:/data_node
 
   coin-extender:
     build:
@@ -65,6 +52,6 @@ services:
       NATS_CLUSTER_ID: event
       NATS_ADDR: nats://nats-1:4222
     depends_on:
-      - db-new
+      - db
       - nats-1
       - nats-streaming-1

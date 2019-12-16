@@ -13,15 +13,15 @@ import (
 	"github.com/go-pg/pg"
 	"github.com/google/uuid"
 	"github.com/nats-io/stan.go"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/address"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/balance"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/block"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/coin"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/events"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/transaction"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/validator"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/address"
+	"github.com/noah-blockchain/noah-extender/internal/balance"
+	"github.com/noah-blockchain/noah-extender/internal/block"
+	"github.com/noah-blockchain/noah-extender/internal/coin"
+	"github.com/noah-blockchain/noah-extender/internal/events"
+	"github.com/noah-blockchain/noah-extender/internal/transaction"
+	"github.com/noah-blockchain/noah-extender/internal/validator"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
@@ -98,9 +98,9 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 		MaxRetries:      10,
 	})
 
-	if env.Debug {
-		db.AddQueryHook(dbLogger{logger: contextLogger})
-	}
+	//if env.Debug {
+	//	db.AddQueryHook(dbLogger{logger: contextLogger})
+	//}
 	//api
 	nodeApi := noah_node_go_api.NewWithFallbackRetries(env.NodeApi, fallbackCount, fallbackTimeout)
 
@@ -159,7 +159,6 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 
 func (ext *Extender) coinWorker() {
 	for {
-
 		err := ext.dbCoinWorker.Update(func(txn *badger.Txn) error {
 			opts := badger.DefaultIteratorOptions
 			opts.PrefetchValues = false

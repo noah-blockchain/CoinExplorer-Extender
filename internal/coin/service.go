@@ -9,11 +9,11 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/nats-io/stan.go"
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/address"
 	coin_extender "github.com/noah-blockchain/coinExplorer-tools"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/address"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/pkg/errors"
@@ -127,30 +127,33 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 	coin.StartPrice = coin.Price
 
-	go func(symbol, from string) {
-		addressKey := fmt.Sprintf("address_%s_%s", symbol, from)
-		err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
-			return txn.Set([]byte(addressKey), []byte("active"))
-		})
-		s.logger.Error(err)
-	}(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
+	if coin.Symbol != s.env.BaseCoin {
+		go func(symbol, from string) {
+			addressKey := fmt.Sprintf("address_%s_%s", symbol, from)
+			err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
+				return txn.Set([]byte(addressKey), []byte("active"))
+			})
+			s.logger.Error(err)
+		}(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
 
-	go func(symbol, hash string) {
-		trxKey := fmt.Sprintf("trx_%s_%s", symbol, hash)
-		err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
-			return txn.Set([]byte(trxKey), []byte("active"))
-		})
-		s.logger.Error(err)
-	}(coin.Symbol, helpers.RemovePrefix(tx.Hash))
+		go func(symbol, hash string) {
+			trxKey := fmt.Sprintf("trx_%s_%s", symbol, hash)
+			err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
+				return txn.Set([]byte(trxKey), []byte("active"))
+			})
+			s.logger.Error(err)
+		}(coin.Symbol, helpers.RemovePrefix(tx.Hash))
 
-	go s.eventCoinMessage(&coin_extender.Coin{
-		Symbol:         coin.Symbol,
-		Price:          coin.Price,
-		Capitalization: coin.Capitalization,
-		ReserveBalance: coin.ReserveBalance,
-		Volume:         coin.Volume,
-		CreatedAt:      ptypes.TimestampNow(),
-	})
+		go s.eventCoinMessage(&coin_extender.Coin{
+			Symbol:         coin.Symbol,
+			Price:          coin.Price,
+			Capitalization: coin.Capitalization,
+			ReserveBalance: coin.ReserveBalance,
+			Volume:         coin.Volume,
+			CreatedAt:      ptypes.TimestampNow(),
+		})
+	}
+
 	return coin, nil
 }
 
@@ -232,7 +235,6 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 		s.logger.Error(err)
 		return nil, err
 	}
-	now := time.Now()
 	coin := new(models.Coin)
 	id, err := s.repository.FindIdBySymbol(symbol)
 	if err != nil {
@@ -254,19 +256,20 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.ReserveBalance = coinResp.Result.ReserveBalance
 	coin.Volume = coinResp.Result.Volume
 	coin.DeletedAt = nil
-	coin.UpdatedAt = now
+	coin.UpdatedAt = time.Now()
 	coin.Price = GetTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
-	go s.eventCoinMessage(&coin_extender.Coin{
-		Symbol:         coin.Symbol,
-		Price:          coin.Price,
-		Capitalization: coin.Capitalization,
-		ReserveBalance: coin.ReserveBalance,
-		Volume:         coin.Volume,
-		CreatedAt:      ptypes.TimestampNow(),
-	})
-
+	if coin.Symbol != s.env.BaseCoin {
+		go s.eventCoinMessage(&coin_extender.Coin{
+			Symbol:         coin.Symbol,
+			Price:          coin.Price,
+			Capitalization: coin.Capitalization,
+			ReserveBalance: coin.ReserveBalance,
+			Volume:         coin.Volume,
+			CreatedAt:      ptypes.TimestampNow(),
+		})
+	}
 	return coin, nil
 }
 

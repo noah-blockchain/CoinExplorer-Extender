@@ -1,7 +1,7 @@
 package coin
 
 import (
-	"github.com/noah-blockchain/CoinExplorer-Extender/internal/utils"
+	"github.com/noah-blockchain/noah-extender/internal/utils"
 	"testing"
 )
 
