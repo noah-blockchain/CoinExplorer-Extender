@@ -55,3 +55,5 @@ services:
       - db
       - nats-1
       - nats-streaming-1
+    volumes:
+      - app-db-sqlite:/db/sqlite

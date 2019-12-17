@@ -1,11 +1,10 @@
 package coin
 
 import (
-	"fmt"
+	"database/sql"
 	"strconv"
 	"time"
 
-	"github.com/dgraph-io/badger"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/nats-io/stan.go"
@@ -28,12 +27,12 @@ type Service struct {
 	logger                *logrus.Entry
 	jobUpdateCoins        chan []*models.Transaction
 	jobUpdateCoinsFromMap chan map[string]struct{}
-	dbCoinWorker          *badger.DB
+	dbCoinWorker          *sql.DB
 	natsStream            stan.Conn
 }
 
 func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
-	addressRepository *address.Repository, logger *logrus.Entry, dbCoinWorker *badger.DB, natsStream stan.Conn) *Service {
+	addressRepository *address.Repository, logger *logrus.Entry, dbCoinWorker *sql.DB, natsStream stan.Conn) *Service {
 
 	return &Service{
 		env:                   env,
@@ -129,18 +128,12 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 
 	if coin.Symbol != s.env.BaseCoin {
 		go func(symbol, from string) {
-			addressKey := fmt.Sprintf("address_%s_%s", symbol, from)
-			err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
-				return txn.Set([]byte(addressKey), []byte("active"))
-			})
+			err := StoreItem(s.dbCoinWorker, symbol, from, OperationAddrId)
 			s.logger.Error(err)
 		}(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
 
 		go func(symbol, hash string) {
-			trxKey := fmt.Sprintf("trx_%s_%s", symbol, hash)
-			err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
-				return txn.Set([]byte(trxKey), []byte("active"))
-			})
+			err := StoreItem(s.dbCoinWorker, symbol, hash, OperationTrxId)
 			s.logger.Error(err)
 		}(coin.Symbol, helpers.RemovePrefix(tx.Hash))
 

@@ -1,15 +1,14 @@
 package core
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"math"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/dgraph-io/badger"
 	"github.com/go-pg/pg"
 	"github.com/google/uuid"
 	"github.com/nats-io/stan.go"
@@ -30,7 +29,7 @@ import (
 const (
 	ChasingModDiff = 2
 
-	badgerFolder = "db/badger"
+	sqliteFolder = "db/sqlite"
 
 	fallbackCount   = 10
 	fallbackTimeout = 15 * time.Second
@@ -51,7 +50,7 @@ type Extender struct {
 	chasingMode         bool
 	currentNodeHeight   uint64
 	logger              *logrus.Entry
-	dbCoinWorker        *badger.DB
+	dbCoinWorker        *sql.DB
 }
 
 type dbLogger struct {
@@ -116,13 +115,14 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 	// Services
 	balanceService := balance.NewService(env, balanceRepository, nodeApi, addressRepository, coinRepository, contextLogger)
 
-	if err := os.MkdirAll(badgerFolder, 0774); err != nil {
+	if err := os.MkdirAll(sqliteFolder, 0774); err != nil {
 		logger.Panicln(err)
 	}
-	dbCoinWorker, err := badger.Open(badger.DefaultOptions(badgerFolder))
-	if err != nil {
+	dbCoinWorker := coin.InitDB(fmt.Sprintf("%s/coin.db", sqliteFolder))
+	if err := coin.CreateTable(dbCoinWorker); err != nil {
 		logger.Panicln(err)
 	}
+
 	natsStream, err := stan.Connect(
 		env.NatsClusterID,
 		uuid.New().String(),
@@ -154,67 +154,6 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 		currentNodeHeight:   0,
 		logger:              contextLogger,
 		dbCoinWorker:        dbCoinWorker,
-	}
-}
-
-func (ext *Extender) coinWorker() {
-	for {
-		err := ext.dbCoinWorker.Update(func(txn *badger.Txn) error {
-			opts := badger.DefaultIteratorOptions
-			opts.PrefetchValues = false
-			it := txn.NewIterator(opts)
-			defer it.Close()
-			for it.Rewind(); it.Valid(); it.Next() {
-				item := it.Item()
-				k := item.Key()
-				ext.logger.Println("KEY ", string(k))
-
-				s := strings.Split(string(k), "_") // (trx/address)_symbol_(hash/addr)
-				if len(s) != 3 {
-					_ = txn.Delete(k)
-					continue
-				}
-				command := s[0]
-				symbol := s[1]
-				value := s[2]
-
-				if command == "address" {
-					addrID, err := ext.addressService.FindId(value)
-					if err != nil {
-						ext.logger.Error(err)
-						continue
-					}
-
-					if err = ext.coinService.UpdateCoinOwner(symbol, addrID); err != nil {
-						ext.logger.Error(err)
-						continue
-					}
-				} else if command == "trx" {
-					trxID, err := ext.transactionService.FindTransactionIdByHash(value)
-					if err != nil {
-						ext.logger.Error(err)
-						continue
-					}
-
-					if err = ext.coinService.UpdateCoinTransaction(symbol, trxID); err != nil {
-						ext.logger.Error(err)
-						continue
-					}
-				}
-
-				if err := txn.Delete(k); err != nil {
-					ext.logger.Panicln(err)
-				}
-			}
-			return nil
-		})
-
-		if err != nil {
-			ext.logger.Error(err)
-		}
-
-		ext.logger.Println("Coin Worker. New attempt")
-		time.Sleep(15 * time.Second)
 	}
 }
 
@@ -489,5 +428,51 @@ func (ext *Extender) findOutChasingMode(height uint64) {
 		}
 		helpers.HandleError(err)
 		ext.chasingMode = ext.currentNodeHeight-height > ChasingModDiff
+	}
+}
+
+func (ext *Extender) coinWorker() {
+	for {
+		items, err := coin.SelectItems(ext.dbCoinWorker)
+		if err != nil || items == nil {
+			ext.logger.Println(err)
+			time.Sleep(15 * time.Second)
+			continue
+		}
+
+		ext.logger.Println("Inside coin worker db ", len(*items))
+
+		for _, item := range *items {
+			if item.OperationType == coin.OperationTrxId {
+				trxID, err := ext.transactionService.FindTransactionIdByHash(item.MetaName)
+				if err != nil {
+					ext.logger.Error(err)
+					continue
+				}
+
+				if err = ext.coinService.UpdateCoinTransaction(item.Symbol, trxID); err != nil {
+					ext.logger.Error(err)
+					continue
+				}
+			} else {
+				addrID, err := ext.addressService.FindId(item.MetaName)
+				if err != nil {
+					ext.logger.Error(err)
+					continue
+				}
+
+				if err = ext.coinService.UpdateCoinOwner(item.Symbol, addrID); err != nil {
+					ext.logger.Error(err)
+					continue
+				}
+			}
+
+			if err = coin.DeleteItem(ext.dbCoinWorker, item.ID); err != nil {
+				ext.logger.Error(err)
+			}
+		}
+
+		ext.logger.Println("Coin Worker. New attempt")
+		time.Sleep(15 * time.Second)
 	}
 }
