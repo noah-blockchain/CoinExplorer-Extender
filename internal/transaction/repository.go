@@ -87,11 +87,11 @@ ON CONFLICT DO NOTHING;
 	return err
 }
 
-func (r *Repository) FindTransactionIdByHash(hash string) (uint64, error) {
-	tx := new(models.Transaction)
-	err := r.db.Model(tx).Column("id").Where("hash = ?", hash).Select(tx)
+func (r *Repository) FindTransactionByHash(hash string) (*models.Transaction, error) {
+	trx := new(models.Transaction)
+	err := r.db.Model(trx).Column("id", "from_address_id").Where("hash = ?", hash).Select(trx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return tx.ID, nil
+	return trx, nil
 }

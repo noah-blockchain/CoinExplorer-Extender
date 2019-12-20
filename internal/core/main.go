@@ -1,16 +1,13 @@
 package core
 
 import (
-	"database/sql"
-	"fmt"
-	"log"
+	"github.com/dgraph-io/badger"
 	"math"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/go-pg/pg"
-	"github.com/google/uuid"
 	"github.com/nats-io/stan.go"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
@@ -28,11 +25,7 @@ import (
 
 const (
 	ChasingModDiff = 2
-
-	sqliteFolder = "db/sqlite"
-
-	fallbackCount   = 10
-	fallbackTimeout = 15 * time.Second
+	CoinWorkerTimeout = time.Minute
 )
 
 type Extender struct {
@@ -50,7 +43,8 @@ type Extender struct {
 	chasingMode         bool
 	currentNodeHeight   uint64
 	logger              *logrus.Entry
-	dbCoinWorker        *sql.DB
+	dbBadger            *badger.DB
+	db                  *pg.DB
 }
 
 type dbLogger struct {
@@ -63,7 +57,7 @@ func (d dbLogger) AfterQuery(q *pg.QueryEvent) {
 	d.logger.Info(q.FormattedQuery())
 }
 
-func NewExtender(env *models.ExtenderEnvironment) *Extender {
+func NewExtender(env *models.ExtenderEnvironment, db *pg.DB, dbBadger *badger.DB, ns stan.Conn, nodeApi *noah_node_go_api.NoahNodeApi) *Extender {
 	//Init Logger
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{})
@@ -85,23 +79,10 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 		"app":     "Coin Explorer Extender",
 	})
 
-	//Init DB
-	db := pg.Connect(&pg.Options{
-		Addr:            fmt.Sprintf("%s:%d", env.DbHost, env.DbPort),
-		User:            env.DbUser,
-		Password:        env.DbPassword,
-		Database:        env.DbName,
-		ApplicationName: env.AppName,
-		MinIdleConns:    env.DbMinIdleConns,
-		PoolSize:        env.DbPoolSize,
-		MaxRetries:      10,
-	})
-
 	//if env.Debug {
 	//	db.AddQueryHook(dbLogger{logger: contextLogger})
 	//}
 	//api
-	nodeApi := noah_node_go_api.NewWithFallbackRetries(env.NodeApi, fallbackCount, fallbackTimeout)
 
 	// Repositories
 	blockRepository := block.NewRepository(db)
@@ -114,29 +95,7 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 
 	// Services
 	balanceService := balance.NewService(env, balanceRepository, nodeApi, addressRepository, coinRepository, contextLogger)
-
-	if err := os.MkdirAll(sqliteFolder, 0774); err != nil {
-		logger.Panicln(err)
-	}
-	dbCoinWorker := coin.InitDB(fmt.Sprintf("%s/coin.db", sqliteFolder))
-	if err := coin.CreateTable(dbCoinWorker); err != nil {
-		logger.Panicln(err)
-	}
-
-	natsStream, err := stan.Connect(
-		env.NatsClusterID,
-		uuid.New().String(),
-		stan.NatsURL(env.NatsAddr),
-		stan.Pings(5, 15),
-		stan.SetConnectionLostHandler(func(con stan.Conn, reason error) {
-			log.Panicln("Connection lost, reason: %v", reason)
-		}),
-	)
-	if err != nil {
-		logger.Panicln(err)
-	}
-
-	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger, dbCoinWorker, natsStream)
+	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger, dbBadger, ns)
 
 	return &Extender{
 		env:                 env,
@@ -153,7 +112,8 @@ func NewExtender(env *models.ExtenderEnvironment) *Extender {
 		chasingMode:         true,
 		currentNodeHeight:   0,
 		logger:              contextLogger,
-		dbCoinWorker:        dbCoinWorker,
+		dbBadger:            dbBadger,
+		db:                  db,
 	}
 }
 
@@ -433,46 +393,46 @@ func (ext *Extender) findOutChasingMode(height uint64) {
 
 func (ext *Extender) coinWorker() {
 	for {
-		items, err := coin.SelectItems(ext.dbCoinWorker)
-		if err != nil || items == nil {
-			ext.logger.Println(err)
-			time.Sleep(15 * time.Second)
-			continue
-		}
+		err := ext.dbBadger.Update(func(txn *badger.Txn) error {
+			opts := badger.DefaultIteratorOptions
+			opts.PrefetchValues = false
+			it := txn.NewIterator(opts)
+			for it.Rewind(); it.Valid(); it.Next() {
+				item := it.Item()
 
-		ext.logger.Println("Inside coin worker db ", len(*items))
+				value, err := item.ValueCopy(nil)
+				key := item.Key()
+				ext.logger.Println("KEY", string(key), "TRX_ID", string(value))
 
-		for _, item := range *items {
-			if item.OperationType == coin.OperationTrxId {
-				trxID, err := ext.transactionService.FindTransactionIdByHash(item.MetaName)
+				trx, err := ext.transactionService.FindTransactionByHash(string(value))
 				if err != nil {
 					ext.logger.Error(err)
 					continue
 				}
 
-				if err = ext.coinService.UpdateCoinTransaction(item.Symbol, trxID); err != nil {
-					ext.logger.Error(err)
-					continue
-				}
-			} else {
-				addrID, err := ext.addressService.FindId(item.MetaName)
-				if err != nil {
+				if err = ext.coinService.UpdateCoinMetaInfo(string(key), trx.ID, trx.FromAddressID); err != nil {
 					ext.logger.Error(err)
 					continue
 				}
 
-				if err = ext.coinService.UpdateCoinOwner(item.Symbol, addrID); err != nil {
+				if err := txn.Delete(key); err != nil {
 					ext.logger.Error(err)
 					continue
 				}
 			}
-
-			if err = coin.DeleteItem(ext.dbCoinWorker, item.ID); err != nil {
-				ext.logger.Error(err)
-			}
+			it.Close()
+			return nil
+		})
+		if err != nil {
+			ext.logger.Error(err)
 		}
 
 		ext.logger.Println("Coin Worker. New attempt")
-		time.Sleep(15 * time.Second)
+		time.Sleep(CoinWorkerTimeout)
 	}
+}
+
+func (ext *Extender) Close() {
+	ext.dbBadger.Close()
+	ext.db.Close()
 }

@@ -367,10 +367,10 @@ func (s *Service) getLinksTxValidator(transactions []*models.Transaction) ([]*mo
 	return links, nil
 }
 
-func (s *Service) FindTransactionIdByHash(hash string) (uint64, error) {
-	trxID, err := s.txRepository.FindTransactionIdByHash(hash)
+func (s *Service) FindTransactionByHash(hash string) (*models.Transaction, error) {
+	trx, err := s.txRepository.FindTransactionByHash(hash)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return trxID, nil
+	return trx, nil
 }

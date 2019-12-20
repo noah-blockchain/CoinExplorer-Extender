@@ -3,6 +3,7 @@ version: '3.6'
 volumes:
   app-db-data:
   nats_streaming_1:
+  app-db-sqlite:
 
 services:
   db:

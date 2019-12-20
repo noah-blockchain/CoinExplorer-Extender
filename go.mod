@@ -5,12 +5,12 @@ go 1.12
 replace mellium.im/sasl v0.2.1 => github.com/mellium/sasl v0.2.1
 
 require (
+	github.com/dgraph-io/badger v1.6.0
 	github.com/go-pg/pg v8.0.5+incompatible
 	github.com/golang-migrate/migrate/v4 v4.7.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/uuid v1.1.1
 	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/nats-io/nats-server/v2 v2.1.2 // indirect

@@ -1,7 +1,7 @@
 package coin
 
 import (
-	"database/sql"
+	"github.com/dgraph-io/badger"
 	"strconv"
 	"time"
 
@@ -27,12 +27,12 @@ type Service struct {
 	logger                *logrus.Entry
 	jobUpdateCoins        chan []*models.Transaction
 	jobUpdateCoinsFromMap chan map[string]struct{}
-	dbCoinWorker          *sql.DB
-	natsStream            stan.Conn
+	dbBadger              *badger.DB
+	ns                    stan.Conn
 }
 
 func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
-	addressRepository *address.Repository, logger *logrus.Entry, dbCoinWorker *sql.DB, natsStream stan.Conn) *Service {
+	addressRepository *address.Repository, logger *logrus.Entry, dbBadger *badger.DB, ns stan.Conn) *Service {
 
 	return &Service{
 		env:                   env,
@@ -42,8 +42,8 @@ func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahN
 		logger:                logger,
 		jobUpdateCoins:        make(chan []*models.Transaction, 1),
 		jobUpdateCoinsFromMap: make(chan map[string]struct{}, 1),
-		dbCoinWorker:          dbCoinWorker,
-		natsStream:            natsStream,
+		dbBadger:              dbBadger,
+		ns:                    ns,
 	}
 }
 
@@ -127,13 +127,10 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 	coin.StartPrice = coin.Price
 
 	if coin.Symbol != s.env.BaseCoin {
-		go func(symbol, from string) {
-			err := StoreItem(s.dbCoinWorker, symbol, from, OperationAddrId)
-			s.logger.Error(err)
-		}(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
-
 		go func(symbol, hash string) {
-			err := StoreItem(s.dbCoinWorker, symbol, hash, OperationTrxId)
+			err = s.dbBadger.Update(func(txn *badger.Txn) error {
+				return txn.Set([]byte(symbol), []byte(hash))
+			})
 			s.logger.Error(err)
 		}(coin.Symbol, helpers.RemovePrefix(tx.Hash))
 
@@ -266,15 +263,8 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	return coin, nil
 }
 
-func (s *Service) UpdateCoinTransaction(symbol string, creationTransactionID uint64) error {
-	if err := s.repository.UpdateCoinTransaction(symbol, creationTransactionID); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *Service) UpdateCoinOwner(symbol string, creationAddressID uint64) error {
-	if err := s.repository.UpdateCoinOwner(symbol, creationAddressID); err != nil {
+func (s *Service) UpdateCoinMetaInfo(symbol string, trxId, ownerAddrId uint64) error {
+	if err := s.repository.UpdateCoinMetaInfo(symbol, trxId, ownerAddrId); err != nil {
 		return err
 	}
 	return nil
@@ -283,7 +273,7 @@ func (s *Service) UpdateCoinOwner(symbol string, creationAddressID uint64) error
 func (s *Service) eventCoinMessage(coin *coin_extender.Coin) {
 	data, _ := proto.Marshal(coin)
 
-	err := s.natsStream.Publish(helpers.CoinCreatedSubject, data)
+	err := s.ns.Publish(helpers.CoinCreatedSubject, data)
 	if err != nil {
 		s.logger.Error(errors.WithStack(err))
 	}
