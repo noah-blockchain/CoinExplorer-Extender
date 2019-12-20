@@ -138,3 +138,14 @@ func (r *Repository) UpdateCoinMetaInfo(symbol string, trxId, ownerAddrId uint64
 	}
 	return nil
 }
+
+func (r *Repository) SelectCoinsWithBrokenMeta() (*[]models.Coin, error) {
+	var coins []models.Coin
+	err := r.db.Model(&coins).Column("symbol").
+		Where("creation_transaction_id IS NULL").
+		Where("id > ?", 1).Select()
+	if err != nil {
+		return nil, err
+	}
+	return &coins, nil
+}

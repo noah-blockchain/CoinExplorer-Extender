@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"github.com/dgraph-io/badger"
 	"math"
 	"os"
@@ -24,7 +25,7 @@ import (
 )
 
 const (
-	ChasingModDiff = 2
+	ChasingModDiff    = 2
 	CoinWorkerTimeout = time.Minute
 )
 
@@ -429,6 +430,54 @@ func (ext *Extender) coinWorker() {
 
 		ext.logger.Println("Coin Worker. New attempt")
 		time.Sleep(CoinWorkerTimeout)
+	}
+}
+
+type CustomTransaction struct {
+	TrxID       uint64
+	OwnerAddrID uint64
+	Symbol      string
+}
+
+func (ext *Extender) FixBrokenCoinMetaInfo() {
+	//get all coins where trx_id==nil and symbol != NOAH
+	coins, err := ext.coinService.SelectCoinsWithBrokenMeta()
+	if err != nil || coins == nil {
+		ext.logger.Println(err)
+		return
+	}
+
+	//get all trx where type == 5
+	transactions, err := ext.transactionService.SelectTransaction(5)
+	if err != nil || transactions == nil {
+		ext.logger.Println(err)
+		return
+	}
+
+	//create array entity with field id, owner_addr_id, symbol from trx
+	trxs := make([]CustomTransaction, len(*transactions))
+	for i, trx := range *transactions {
+		obj := models.CreateCoinTxData{}
+		if err := json.Unmarshal(trx.Data, &obj); err != nil {
+			continue
+		}
+		trxs[i] = CustomTransaction{
+			TrxID:       trx.ID,
+			OwnerAddrID: trx.FromAddressID,
+			Symbol:      obj.Symbol,
+		}
+	}
+
+	//find where coin.symbol == trx.symbol
+	//update coin info
+	for _, c := range *coins {
+		for _, trx := range trxs {
+			if c.Symbol == trx.Symbol {
+				if err := ext.coinService.UpdateCoinMetaInfo(c.Symbol, trx.TrxID, trx.OwnerAddrID); err != nil {
+					ext.logger.Println(err)
+				}
+			}
+		}
 	}
 }
 

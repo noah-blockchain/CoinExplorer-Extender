@@ -95,3 +95,13 @@ func (r *Repository) FindTransactionByHash(hash string) (*models.Transaction, er
 	}
 	return trx, nil
 }
+
+func (r *Repository) SelectTransaction(typeTrx uint8) (*[]models.Transaction, error) {
+	var transactions []models.Transaction
+	err := r.db.Model(&transactions).Column("id", "from_address_id", "data").Where("type = ?", typeTrx).Select()
+	if err != nil {
+		return nil, err
+	}
+	return &transactions, nil
+}
+

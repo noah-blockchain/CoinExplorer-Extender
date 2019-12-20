@@ -270,6 +270,14 @@ func (s *Service) UpdateCoinMetaInfo(symbol string, trxId, ownerAddrId uint64) e
 	return nil
 }
 
+func (s *Service) SelectCoinsWithBrokenMeta() (*[]models.Coin, error) {
+	coins, err := s.repository.SelectCoinsWithBrokenMeta()
+	if err != nil || coins == nil{
+		return nil, err
+	}
+	return coins, nil
+}
+
 func (s *Service) eventCoinMessage(coin *coin_extender.Coin) {
 	data, _ := proto.Marshal(coin)
 

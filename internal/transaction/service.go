@@ -374,3 +374,11 @@ func (s *Service) FindTransactionByHash(hash string) (*models.Transaction, error
 	}
 	return trx, nil
 }
+
+func (s *Service) SelectTransaction(typeTrx uint8) (*[]models.Transaction, error) {
+	transactions, err := s.txRepository.SelectTransaction(typeTrx)
+	if err != nil || transactions == nil {
+		return nil, err
+	}
+	return transactions, nil
+}
