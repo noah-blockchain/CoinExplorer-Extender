@@ -124,6 +124,6 @@ func runMigrations(envData *models.ExtenderEnvironment) error {
 		return err
 	}
 
-	_ = m.Steps(1)
+	_ = m.Steps(2)
 	return nil
 }
