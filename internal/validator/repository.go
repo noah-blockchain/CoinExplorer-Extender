@@ -185,7 +185,7 @@ func (r Repository) GetFullSignedCountValidatorBlock(validatorID uint64, created
 		Join("LEFT JOIN validators AS v ON v.id = block_validator.validator_id").
 		Where("v.id = ?", validatorID).
 		Where("v.status = ?", models.ValidatorStatusReady).
-		Where("v.created_at >= ?", createdTime).
+		Where("block_validator.created_at >= ?", createdTime).
 		Select(&count)
 	if err != nil {
 		return 0, err
