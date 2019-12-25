@@ -2,6 +2,7 @@ package validator
 
 import (
 	"sync"
+	"time"
 
 	"github.com/go-pg/pg"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
@@ -51,6 +52,17 @@ func (r *Repository) FindIdByPkOrCreate(pk string) (uint64, error) {
 	}
 	return id, nil
 }
+
+func (r *Repository) FindValidatorById(id uint64) (*models.Validator, error) {
+	//First look in the cache
+	validator := new(models.Validator)
+	err := r.db.Model(validator).Where("id = ?", id).Select()
+	if err != nil {
+		return nil, err
+	}
+	return validator, nil
+}
+
 
 // Save list of validators if not exist
 func (r *Repository) SaveAllIfNotExist(validators []*models.Validator) error {
@@ -164,7 +176,7 @@ func (r Repository) ResetAllUptimes() error {
 	return err
 }
 
-func (r Repository) GetFullSignedCountValidatorBlock(validatorID uint64) (uint64, error) {
+func (r Repository) GetFullSignedCountValidatorBlock(validatorID uint64, createdTime time.Time) (uint64, error) {
 	var blockValidator models.BlockValidator
 	var count uint64
 
@@ -173,6 +185,7 @@ func (r Repository) GetFullSignedCountValidatorBlock(validatorID uint64) (uint64
 		Join("LEFT JOIN validators AS v ON v.id = block_validator.validator_id").
 		Where("v.id = ?", validatorID).
 		Where("v.status = ?", models.ValidatorStatusReady).
+		Where("v.created_at >= ?", createdTime).
 		Select(&count)
 	if err != nil {
 		return 0, err

@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	precision = 100
+	precision                 = 100
+	calcUptimeValidatorBlocks = 192
 )
 
 type Service struct {
@@ -276,11 +277,18 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 			s.logger.Error(errors.WithStack(err))
 		}
 
-		if height%192 == 0 { //update uptime
+		if height%calcUptimeValidatorBlocks == 0 { //update uptime
 			_ = s.Repository.ResetAllUptimes()
 			for _, validatorID := range validatorIds {
+				// calc uptime
 				go func(validatorID uint64) {
-					signedCount, err := s.Repository.GetFullSignedCountValidatorBlock(validatorID)
+					validator, err := s.Repository.FindValidatorById(validatorID)
+					if err != nil {
+						s.logger.Error(errors.WithStack(err))
+						return
+					}
+
+					signedCount, err := s.Repository.GetFullSignedCountValidatorBlock(validator.ID, validator.CreatedAt)
 					if err != nil {
 						s.logger.Error(errors.WithStack(err))
 						return
@@ -294,6 +302,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 					}
 				}(validatorID)
 
+				// calc count validators
 				go func(validatorID uint64) {
 					countDelegators, err := s.Repository.GetCountDelegators(validatorID)
 					if err != nil {
