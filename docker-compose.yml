@@ -3,7 +3,6 @@ version: '3.6'
 volumes:
   app-db-data:
   nats_streaming_1:
-  app-db-sqlite:
 
 services:
   db:
@@ -12,7 +11,7 @@ services:
     ports:
       - 5432:5432
     environment:
-      POSTGRES_DB: coin_explorer_new
+      POSTGRES_DB: explorer
       POSTGRES_USER: noah
       POSTGRES_PASSWORD: password
     volumes:
@@ -56,5 +55,3 @@ services:
       - db
       - nats-1
       - nats-streaming-1
-    volumes:
-      - app-db-sqlite:/db/sqlite

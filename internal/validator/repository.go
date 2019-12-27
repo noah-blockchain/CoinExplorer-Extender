@@ -63,7 +63,6 @@ func (r *Repository) FindValidatorById(id uint64) (*models.Validator, error) {
 	return validator, nil
 }
 
-
 // Save list of validators if not exist
 func (r *Repository) SaveAllIfNotExist(validators []*models.Validator) error {
 	if r.isAllAddressesInCache(validators) {
@@ -225,4 +224,19 @@ func (r *Repository) UpdateCountDelegators(validatorID uint64, countDelegators u
 		return err
 	}
 	return nil
+}
+
+func (r Repository) GetCountBlockFromDate(createdAt time.Time) (uint64, error) {
+	var block models.Block
+	var count uint64
+
+	err := r.db.Model(&block).
+		ColumnExpr("COUNT(blocks.id)").
+		Where("blocks.created_at >= ?", createdAt).
+		Select(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
