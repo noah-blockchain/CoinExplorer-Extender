@@ -2,12 +2,12 @@ package core
 
 import (
 	"encoding/json"
-	"github.com/dgraph-io/badger"
 	"math"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/dgraph-io/badger"
 	"github.com/go-pg/pg"
 	"github.com/nats-io/stan.go"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
@@ -394,40 +394,40 @@ func (ext *Extender) findOutChasingMode(height uint64) {
 
 func (ext *Extender) coinWorker() {
 	for {
-		err := ext.dbBadger.Update(func(txn *badger.Txn) error {
-			opts := badger.DefaultIteratorOptions
-			opts.PrefetchValues = false
-			it := txn.NewIterator(opts)
-			for it.Rewind(); it.Valid(); it.Next() {
-				item := it.Item()
-
-				value, err := item.ValueCopy(nil)
-				key := item.Key()
-				ext.logger.Println("KEY", string(key), "TRX_ID", string(value))
-
-				trx, err := ext.transactionService.FindTransactionByHash(string(value))
-				if err != nil {
-					ext.logger.Error(err)
-					continue
-				}
-
-				if err = ext.coinService.UpdateCoinMetaInfo(string(key), trx.ID, trx.FromAddressID); err != nil {
-					ext.logger.Error(err)
-					continue
-				}
-
-				if err := txn.Delete(key); err != nil {
-					ext.logger.Error(err)
-					continue
-				}
-			}
-			it.Close()
-			return nil
-		})
-		if err != nil {
-			ext.logger.Error(err)
-		}
-
+		//err := ext.dbBadger.Update(func(txn *badger.Txn) error {
+		//	opts := badger.DefaultIteratorOptions
+		//	opts.PrefetchValues = false
+		//	it := txn.NewIterator(opts)
+		//	for it.Rewind(); it.Valid(); it.Next() {
+		//		item := it.Item()
+		//
+		//		value, err := item.ValueCopy(nil)
+		//		key := item.Key()
+		//		ext.logger.Println("KEY", string(key), "TRX_ID", string(value))
+		//
+		//		trx, err := ext.transactionService.FindTransactionByHash(string(value))
+		//		if err != nil {
+		//			ext.logger.Error(err)
+		//			continue
+		//		}
+		//
+		//		if err = ext.coinService.UpdateCoinMetaInfo(string(key), trx.ID, trx.FromAddressID); err != nil {
+		//			ext.logger.Error(err)
+		//			continue
+		//		}
+		//
+		//		if err := txn.Delete(key); err != nil {
+		//			ext.logger.Error(err)
+		//			continue
+		//		}
+		//	}
+		//	it.Close()
+		//	return nil
+		//})
+		//if err != nil {
+		//	ext.logger.Error(err)
+		//}
+		ext.FixBrokenCoinMetaInfo()
 		ext.logger.Println("Coin Worker. New attempt")
 		time.Sleep(CoinWorkerTimeout)
 	}
@@ -448,7 +448,7 @@ func (ext *Extender) FixBrokenCoinMetaInfo() {
 	}
 
 	//get all trx where type == 5
-	transactions, err := ext.transactionService.SelectTransaction(5)
+	transactions, err := ext.transactionService.SelectCoinsTransaction()
 	if err != nil || transactions == nil {
 		ext.logger.Println(err)
 		return
@@ -461,6 +461,7 @@ func (ext *Extender) FixBrokenCoinMetaInfo() {
 		if err := json.Unmarshal(trx.Data, &obj); err != nil {
 			continue
 		}
+
 		trxs[i] = CustomTransaction{
 			TrxID:       trx.ID,
 			OwnerAddrID: trx.FromAddressID,
@@ -472,10 +473,12 @@ func (ext *Extender) FixBrokenCoinMetaInfo() {
 	//update coin info
 	for _, c := range *coins {
 		for _, trx := range trxs {
-			if c.Symbol == trx.Symbol {
-				if err := ext.coinService.UpdateCoinMetaInfo(c.Symbol, trx.TrxID, trx.OwnerAddrID); err != nil {
-					ext.logger.Println(err)
-				}
+			if c.Symbol != trx.Symbol {
+				continue
+			}
+
+			if err := ext.coinService.UpdateCoinMetaInfo(c.Symbol, trx.TrxID, trx.OwnerAddrID); err != nil {
+				ext.logger.Println(err)
 			}
 		}
 	}

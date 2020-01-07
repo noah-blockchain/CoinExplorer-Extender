@@ -35,23 +35,23 @@ services:
     volumes:
       - nats_streaming_1:/data_node
 
-  coin-extender:
-    build:
-      context: .
-    container_name: coin-extender
-    environment:
-      DB_PORT: 5432
-      DB_HOST: db
-      DB_USER: noah
-      DB_PASSWORD: password
-      DB_NAME: coin_explorer_new
-      NOAH_API_NODE: http://localhost:8841
-      COIN_EXTENDER_API_HOST: localhost
-      COIN_EXTENDER_API_PORT: 10000
-      DEBUG: "true"
-      NATS_CLUSTER_ID: event
-      NATS_ADDR: nats://nats-1:4222
-    depends_on:
-      - db
-      - nats-1
-      - nats-streaming-1
+#  coin-extender:
+#    build:
+#      context: .
+#    container_name: coin-extender
+#    environment:
+#      DB_PORT: 5432
+#      DB_HOST: db
+#      DB_USER: noah
+#      DB_PASSWORD: password
+#      DB_NAME: coin_explorer_new
+#      NOAH_API_NODE: http://localhost:8841
+#      COIN_EXTENDER_API_HOST: localhost
+#      COIN_EXTENDER_API_PORT: 10000
+#      DEBUG: "true"
+#      NATS_CLUSTER_ID: event
+#      NATS_ADDR: nats://nats-1:4222
+#    depends_on:
+#      - db
+#      - nats-1
+#      - nats-streaming-1

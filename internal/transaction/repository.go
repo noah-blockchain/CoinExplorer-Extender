@@ -96,9 +96,15 @@ func (r *Repository) FindTransactionByHash(hash string) (*models.Transaction, er
 	return trx, nil
 }
 
-func (r *Repository) SelectTransaction(typeTrx uint8) (*[]models.Transaction, error) {
+func (r *Repository) SelectCoinsTransaction() (*[]models.Transaction, error) {
 	var transactions []models.Transaction
-	err := r.db.Model(&transactions).Column("id", "from_address_id", "data").Where("type = ?", typeTrx).Select()
+	_, err := r.db.Query(&transactions, `
+		SELECT t.id, t.from_address_id, t.data
+			FROM public.transactions as t
+			where t.type=? and t.id not in
+			(select c.creation_transaction_id from public.coins as c
+				where c.creation_transaction_id is not null);
+	`, models.TxTypeCreateCoin)
 	if err != nil {
 		return nil, err
 	}

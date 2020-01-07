@@ -1,10 +1,10 @@
 package coin
 
 import (
-	"github.com/dgraph-io/badger"
 	"strconv"
 	"time"
 
+	"github.com/dgraph-io/badger"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/nats-io/stan.go"
@@ -272,7 +272,7 @@ func (s *Service) UpdateCoinMetaInfo(symbol string, trxId, ownerAddrId uint64) e
 
 func (s *Service) SelectCoinsWithBrokenMeta() (*[]models.Coin, error) {
 	coins, err := s.repository.SelectCoinsWithBrokenMeta()
-	if err != nil || coins == nil{
+	if err != nil || coins == nil {
 		return nil, err
 	}
 	return coins, nil

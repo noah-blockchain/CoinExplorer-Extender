@@ -300,7 +300,11 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 						return
 					}
 
-					value := float64(signedCount) / float64(validatorBlocksHeight)
+					var value float64
+					if validatorBlocksHeight > 0 {
+						value = float64(signedCount / validatorBlocksHeight)
+					}
+
 					var uptime = math.Min(value*100, 100.0)
 					if err = s.Repository.UpdateValidatorUptime(validatorID, uptime); err != nil {
 						s.logger.Error(errors.WithStack(err))

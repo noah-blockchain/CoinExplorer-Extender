@@ -231,8 +231,8 @@ func (r Repository) GetCountBlockFromDate(createdAt time.Time) (uint64, error) {
 	var count uint64
 
 	err := r.db.Model(&block).
-		ColumnExpr("COUNT(blocks.id)").
-		Where("blocks.created_at >= ?", createdAt).
+		ColumnExpr("COUNT(block.id)").
+		Where("block.created_at >= ?", createdAt).
 		Select(&count)
 	if err != nil {
 		return 0, err
