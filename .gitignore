@@ -161,3 +161,4 @@ build
 go.sum
 
 db
+cmd/uptime-test

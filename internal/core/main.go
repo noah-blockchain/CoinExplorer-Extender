@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"github.com/pkg/errors"
 	"math"
 	"os"
 	"strconv"
@@ -97,7 +98,6 @@ func NewExtender(env *models.ExtenderEnvironment, db *pg.DB, dbBadger *badger.DB
 	// Services
 	balanceService := balance.NewService(env, balanceRepository, nodeApi, addressRepository, coinRepository, contextLogger)
 	coinService := coin.NewService(env, nodeApi, coinRepository, addressRepository, contextLogger, dbBadger, ns)
-
 	return &Extender{
 		env:                 env,
 		nodeApi:             nodeApi,
@@ -119,6 +119,7 @@ func NewExtender(env *models.ExtenderEnvironment, db *pg.DB, dbBadger *badger.DB
 }
 
 func (ext *Extender) Run() {
+	ext.UpdateValidatorsUptime()
 
 	//check connections to node
 	_, err := ext.nodeApi.GetStatus()
@@ -482,6 +483,44 @@ func (ext *Extender) FixBrokenCoinMetaInfo() {
 			}
 		}
 	}
+}
+
+func (ext *Extender) UpdateValidatorsUptime() {
+	v, err := ext.validatorRepository.FindValidatorById(24)
+	if err != nil {
+		ext.logger.Error(errors.WithStack(err))
+		return
+	}
+	ext.logger.Println("Validator", v.CreatedAt, v.ID, v.GetPublicKey())
+
+	signedCount, err := ext.validatorRepository.GetFullSignedCountValidatorBlock(v.ID, v.CreatedAt)
+	if err != nil {
+		ext.logger.Error(errors.WithStack(err))
+		return
+	}
+	ext.logger.Println("Signed count", signedCount)
+
+	validatorBlocksHeight, err := ext.validatorRepository.GetCountBlockFromDate(v.CreatedAt)
+	if err != nil {
+		ext.logger.Error(errors.WithStack(err))
+		return
+	}
+	ext.logger.Println("validatorBlocksHeight", validatorBlocksHeight)
+
+	var value float64
+	if validatorBlocksHeight > 0 {
+		value = float64(signedCount / validatorBlocksHeight)
+	}
+	ext.logger.Println("value", value)
+
+	var uptime = math.Min(value*100, 100.0)
+	ext.logger.Println("uptime", uptime)
+
+	if err = ext.validatorRepository.UpdateValidatorUptime(24, uptime); err != nil {
+		ext.logger.Error(errors.WithStack(err))
+		return
+	}
+	ext.logger.Println("OK")
 }
 
 func (ext *Extender) Close() {
