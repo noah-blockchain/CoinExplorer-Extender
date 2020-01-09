@@ -492,13 +492,13 @@ func (ext *Extender) validatorUptimeWorker() {
 }
 
 func (ext *Extender) updateValidatorsUptime() {
-	_ = ext.validatorRepository.ResetAllUptimes()
 	validators, err := ext.validatorRepository.GetActiveValidators()
 	if err != nil || validators == nil {
 		ext.logger.Error(errors.WithStack(err))
 		return
 	}
 
+	_ = ext.validatorRepository.ResetAllUptimes()
 	for _, v := range *validators {
 		signedCount, err := ext.validatorRepository.GetFullSignedCountValidatorBlock(v.ID, v.CreatedAt)
 		if err != nil {
@@ -520,7 +520,7 @@ func (ext *Extender) updateValidatorsUptime() {
 		}
 
 		var uptime = math.Min(value*100, 100.0)
-		if err = ext.validatorRepository.UpdateValidatorUptime(24, uptime); err != nil {
+		if err = ext.validatorRepository.UpdateValidatorUptime(v.ID, uptime); err != nil {
 			ext.logger.Error(errors.WithStack(err))
 			continue
 		}
