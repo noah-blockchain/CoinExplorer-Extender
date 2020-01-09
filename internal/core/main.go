@@ -509,7 +509,7 @@ func (ext *Extender) UpdateValidatorsUptime() {
 
 	var value float64
 	if validatorBlocksHeight > 0 {
-		value = float64(signedCount / validatorBlocksHeight)
+		value = float64(signedCount) / float64(validatorBlocksHeight)
 	}
 	ext.logger.Println("value", value)
 
