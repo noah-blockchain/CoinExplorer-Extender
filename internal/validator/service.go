@@ -278,40 +278,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 		}
 
 		if height%calcUptimeValidatorBlocks == 0 { //update uptime
-			_ = s.Repository.ResetAllUptimes()
 			for _, validatorID := range validatorIds {
-				// calc uptime
-				go func(validatorID uint64) {
-					validator, err := s.Repository.FindValidatorById(validatorID)
-					if err != nil {
-						s.logger.Error(errors.WithStack(err))
-						return
-					}
-
-					signedCount, err := s.Repository.GetFullSignedCountValidatorBlock(validator.ID, validator.CreatedAt)
-					if err != nil {
-						s.logger.Error(errors.WithStack(err))
-						return
-					}
-
-					validatorBlocksHeight, err := s.Repository.GetCountBlockFromDate(validator.CreatedAt)
-					if err != nil {
-						s.logger.Error(errors.WithStack(err))
-						return
-					}
-
-					var value float64
-					if validatorBlocksHeight > 0 {
-						value = float64(signedCount / validatorBlocksHeight)
-					}
-
-					var uptime = math.Min(value*100, 100.0)
-					if err = s.Repository.UpdateValidatorUptime(validatorID, uptime); err != nil {
-						s.logger.Error(errors.WithStack(err))
-						return
-					}
-				}(validatorID)
-
 				// calc count validators
 				go func(validatorID uint64) {
 					countDelegators, err := s.Repository.GetCountDelegators(validatorID)

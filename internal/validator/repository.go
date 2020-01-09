@@ -240,3 +240,14 @@ func (r Repository) GetCountBlockFromDate(createdAt time.Time) (uint64, error) {
 
 	return count, nil
 }
+
+func (r *Repository) GetActiveValidators() (*[]models.Validator, error) {
+	var validators []models.Validator
+	_, err := r.db.Query(&validators, `
+		SELECT v.* FROM public.validators as v WHERE v.status=?
+	`, models.ValidatorStatusReady)
+	if err != nil {
+		return nil, err
+	}
+	return &validators, nil
+}

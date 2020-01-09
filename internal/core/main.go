@@ -119,8 +119,6 @@ func NewExtender(env *models.ExtenderEnvironment, db *pg.DB, dbBadger *badger.DB
 }
 
 func (ext *Extender) Run() {
-	ext.UpdateValidatorsUptime()
-
 	//check connections to node
 	_, err := ext.nodeApi.GetStatus()
 	if err == nil {
@@ -228,6 +226,7 @@ func (ext *Extender) runWorkers() {
 	go ext.coinService.UpdateCoinsInfoFromTxsWorker(ext.coinService.GetUpdateCoinsFromTxsJobChannel())
 	go ext.coinService.UpdateCoinsInfoFromCoinsMap(ext.coinService.GetUpdateCoinsFromCoinsMapJobChannel())
 	go ext.coinWorker()
+	go ext.validatorUptimeWorker()
 }
 
 func (ext *Extender) handleAddressesFromResponses(blockResponse *responses.BlockResponse, eventsResponse *responses.EventsResponse) {
@@ -485,42 +484,47 @@ func (ext *Extender) FixBrokenCoinMetaInfo() {
 	}
 }
 
-func (ext *Extender) UpdateValidatorsUptime() {
-	v, err := ext.validatorRepository.FindValidatorById(24)
-	if err != nil {
+func (ext *Extender) validatorUptimeWorker() {
+	for {
+		ext.updateValidatorsUptime()
+		time.Sleep(5 * time.Minute)
+	}
+}
+
+func (ext *Extender) updateValidatorsUptime() {
+	_ = ext.validatorRepository.ResetAllUptimes()
+	validators, err := ext.validatorRepository.GetActiveValidators()
+	if err != nil || validators == nil {
 		ext.logger.Error(errors.WithStack(err))
 		return
 	}
-	ext.logger.Println("Validator", v.CreatedAt, v.ID, v.GetPublicKey())
 
-	signedCount, err := ext.validatorRepository.GetFullSignedCountValidatorBlock(v.ID, v.CreatedAt)
-	if err != nil {
-		ext.logger.Error(errors.WithStack(err))
-		return
+	for _, v := range *validators {
+		signedCount, err := ext.validatorRepository.GetFullSignedCountValidatorBlock(v.ID, v.CreatedAt)
+		if err != nil {
+			ext.logger.Error(errors.WithStack(err))
+			continue
+		}
+		ext.logger.Println("Signed count", signedCount)
+
+		validatorBlocksHeight, err := ext.validatorRepository.GetCountBlockFromDate(v.CreatedAt)
+		if err != nil {
+			ext.logger.Error(errors.WithStack(err))
+			continue
+		}
+		ext.logger.Println("Validator Blocks Height", validatorBlocksHeight)
+
+		var value float64
+		if validatorBlocksHeight > 0 {
+			value = float64(signedCount) / float64(validatorBlocksHeight)
+		}
+
+		var uptime = math.Min(value*100, 100.0)
+		if err = ext.validatorRepository.UpdateValidatorUptime(24, uptime); err != nil {
+			ext.logger.Error(errors.WithStack(err))
+			continue
+		}
 	}
-	ext.logger.Println("Signed count", signedCount)
-
-	validatorBlocksHeight, err := ext.validatorRepository.GetCountBlockFromDate(v.CreatedAt)
-	if err != nil {
-		ext.logger.Error(errors.WithStack(err))
-		return
-	}
-	ext.logger.Println("validatorBlocksHeight", validatorBlocksHeight)
-
-	var value float64
-	if validatorBlocksHeight > 0 {
-		value = float64(signedCount) / float64(validatorBlocksHeight)
-	}
-	ext.logger.Println("value", value)
-
-	var uptime = math.Min(value*100, 100.0)
-	ext.logger.Println("uptime", uptime)
-
-	if err = ext.validatorRepository.UpdateValidatorUptime(24, uptime); err != nil {
-		ext.logger.Error(errors.WithStack(err))
-		return
-	}
-	ext.logger.Println("OK")
 }
 
 func (ext *Extender) Close() {
