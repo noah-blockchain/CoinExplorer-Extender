@@ -149,7 +149,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 		}
 
 		if resp.Error != nil {
-			s.logger.Errorf("UpdateStakesWorker error: message=%s and data=%s", resp.Error.Message, resp.Error.Data) // todo
+			//s.logger.Errorf("UpdateStakesWorker error: message=%s and data=%s", resp.Error.Message, resp.Error.Data) // todo
 			continue
 		}
 

@@ -19,7 +19,7 @@ require (
 	github.com/noah-blockchain/coinExplorer-tools v0.1.7
 	github.com/noah-blockchain/noah-explorer-tools v0.1.1
 	github.com/noah-blockchain/noah-go-node v0.2.0
-	github.com/noah-blockchain/noah-node-go-api v0.1.1
+	github.com/noah-blockchain/noah-node-go-api v0.1.2
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/sirupsen/logrus v1.4.2

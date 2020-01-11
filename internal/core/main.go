@@ -143,7 +143,7 @@ func (ext *Extender) Run() {
 	}
 
 	for {
-		start := time.Now()
+		//start := time.Now()
 		ext.findOutChasingMode(height)
 		//Pulling block data
 		blockResponse, err := ext.nodeApi.GetBlock(height)
@@ -171,8 +171,8 @@ func (ext *Extender) Run() {
 
 		height++
 
-		elapsed := time.Since(start)
-		ext.logger.Info("Processing time: ", elapsed)
+		//elapsed := time.Since(start)
+		//ext.logger.Info("Processing time: ", elapsed)
 	}
 }
 
@@ -505,14 +505,14 @@ func (ext *Extender) updateValidatorsUptime() {
 			ext.logger.Error(errors.WithStack(err))
 			continue
 		}
-		ext.logger.Println("Signed count", signedCount)
+		//ext.logger.Println("Signed count", signedCount)
 
 		validatorBlocksHeight, err := ext.validatorRepository.GetCountBlockFromDate(v.CreatedAt)
 		if err != nil {
 			ext.logger.Error(errors.WithStack(err))
 			continue
 		}
-		ext.logger.Println("Validator Blocks Height", validatorBlocksHeight)
+		//ext.logger.Println("Validator Blocks Height", validatorBlocksHeight)
 
 		var value float64
 		if validatorBlocksHeight > 0 {

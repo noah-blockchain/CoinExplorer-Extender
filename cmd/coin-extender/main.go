@@ -46,7 +46,6 @@ func main() {
 	ext := core.NewExtender(envData, db, dbBadger, ns, nodeAPI)
 	defer ext.Close()
 
-	ext.FixBrokenCoinMetaInfo()
 	ext.Run()
 }
 
