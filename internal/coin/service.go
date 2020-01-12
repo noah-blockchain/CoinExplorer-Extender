@@ -1,7 +1,6 @@
 package coin
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -9,11 +8,11 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/nats-io/stan.go"
-	"github.com/noah-blockchain/CoinExplorer-Extender/address"
 	coin_extender "github.com/noah-blockchain/coinExplorer-tools"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/address"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/pkg/errors"
@@ -28,12 +27,12 @@ type Service struct {
 	logger                *logrus.Entry
 	jobUpdateCoins        chan []*models.Transaction
 	jobUpdateCoinsFromMap chan map[string]struct{}
-	dbCoinWorker          *badger.DB
-	natsStream            stan.Conn
+	dbBadger              *badger.DB
+	ns                    stan.Conn
 }
 
 func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahNodeApi, repository *Repository,
-	addressRepository *address.Repository, logger *logrus.Entry, dbCoinWorker *badger.DB, natsStream stan.Conn) *Service {
+	addressRepository *address.Repository, logger *logrus.Entry, dbBadger *badger.DB, ns stan.Conn) *Service {
 
 	return &Service{
 		env:                   env,
@@ -43,8 +42,8 @@ func NewService(env *models.ExtenderEnvironment, nodeApi *noah_node_go_api.NoahN
 		logger:                logger,
 		jobUpdateCoins:        make(chan []*models.Transaction, 1),
 		jobUpdateCoinsFromMap: make(chan map[string]struct{}, 1),
-		dbCoinWorker:          dbCoinWorker,
-		natsStream:            natsStream,
+		dbBadger:              dbBadger,
+		ns:                    ns,
 	}
 }
 
@@ -127,30 +126,24 @@ func (s *Service) ExtractFromTx(tx responses.Transaction) (*models.Coin, error) 
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 	coin.StartPrice = coin.Price
 
-	go func(symbol, from string) {
-		addressKey := fmt.Sprintf("address_%s_%s", symbol, from)
-		err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
-			return txn.Set([]byte(addressKey), []byte("active"))
-		})
-		s.logger.Error(err)
-	}(coin.Symbol, helpers.RemovePrefixFromAddress(tx.From))
+	if coin.Symbol != s.env.BaseCoin {
+		go func(symbol, hash string) {
+			err = s.dbBadger.Update(func(txn *badger.Txn) error {
+				return txn.Set([]byte(symbol), []byte(hash))
+			})
+			s.logger.Error(err)
+		}(coin.Symbol, helpers.RemovePrefix(tx.Hash))
 
-	go func(symbol, hash string) {
-		trxKey := fmt.Sprintf("trx_%s_%s", symbol, hash)
-		err = s.dbCoinWorker.Update(func(txn *badger.Txn) error {
-			return txn.Set([]byte(trxKey), []byte("active"))
+		go s.eventCoinMessage(&coin_extender.Coin{
+			Symbol:         coin.Symbol,
+			Price:          coin.Price,
+			Capitalization: coin.Capitalization,
+			ReserveBalance: coin.ReserveBalance,
+			Volume:         coin.Volume,
+			CreatedAt:      ptypes.TimestampNow(),
 		})
-		s.logger.Error(err)
-	}(coin.Symbol, helpers.RemovePrefix(tx.Hash))
+	}
 
-	go s.eventCoinMessage(&coin_extender.Coin{
-		Symbol:         coin.Symbol,
-		Price:          coin.Price,
-		Capitalization: coin.Capitalization,
-		ReserveBalance: coin.ReserveBalance,
-		Volume:         coin.Volume,
-		CreatedAt:      ptypes.TimestampNow(),
-	})
 	return coin, nil
 }
 
@@ -232,7 +225,6 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 		s.logger.Error(err)
 		return nil, err
 	}
-	now := time.Now()
 	coin := new(models.Coin)
 	id, err := s.repository.FindIdBySymbol(symbol)
 	if err != nil {
@@ -254,40 +246,42 @@ func (s *Service) GetCoinFromNode(symbol string) (*models.Coin, error) {
 	coin.ReserveBalance = coinResp.Result.ReserveBalance
 	coin.Volume = coinResp.Result.Volume
 	coin.DeletedAt = nil
-	coin.UpdatedAt = now
+	coin.UpdatedAt = time.Now()
 	coin.Price = GetTokenPrice(coinResp.Result.Volume, coinResp.Result.ReserveBalance, crr)
 	coin.Capitalization = GetCapitalization(coin.Volume, coin.Price)
 
-	go s.eventCoinMessage(&coin_extender.Coin{
-		Symbol:         coin.Symbol,
-		Price:          coin.Price,
-		Capitalization: coin.Capitalization,
-		ReserveBalance: coin.ReserveBalance,
-		Volume:         coin.Volume,
-		CreatedAt:      ptypes.TimestampNow(),
-	})
-
+	if coin.Symbol != s.env.BaseCoin {
+		go s.eventCoinMessage(&coin_extender.Coin{
+			Symbol:         coin.Symbol,
+			Price:          coin.Price,
+			Capitalization: coin.Capitalization,
+			ReserveBalance: coin.ReserveBalance,
+			Volume:         coin.Volume,
+			CreatedAt:      ptypes.TimestampNow(),
+		})
+	}
 	return coin, nil
 }
 
-func (s *Service) UpdateCoinTransaction(symbol string, creationTransactionID uint64) error {
-	if err := s.repository.UpdateCoinTransaction(symbol, creationTransactionID); err != nil {
+func (s *Service) UpdateCoinMetaInfo(symbol string, trxId, ownerAddrId uint64) error {
+	if err := s.repository.UpdateCoinMetaInfo(symbol, trxId, ownerAddrId); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *Service) UpdateCoinOwner(symbol string, creationAddressID uint64) error {
-	if err := s.repository.UpdateCoinOwner(symbol, creationAddressID); err != nil {
-		return err
+func (s *Service) SelectCoinsWithBrokenMeta() (*[]models.Coin, error) {
+	coins, err := s.repository.SelectCoinsWithBrokenMeta()
+	if err != nil || coins == nil {
+		return nil, err
 	}
-	return nil
+	return coins, nil
 }
 
 func (s *Service) eventCoinMessage(coin *coin_extender.Coin) {
 	data, _ := proto.Marshal(coin)
 
-	err := s.natsStream.Publish(helpers.CoinCreatedSubject, data)
+	err := s.ns.Publish(helpers.CoinCreatedSubject, data)
 	if err != nil {
 		s.logger.Error(errors.WithStack(err))
 	}

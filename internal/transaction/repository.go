@@ -87,11 +87,27 @@ ON CONFLICT DO NOTHING;
 	return err
 }
 
-func (r *Repository) FindTransactionIdByHash(hash string) (uint64, error) {
-	tx := new(models.Transaction)
-	err := r.db.Model(tx).Column("id").Where("hash = ?", hash).Select(tx)
+func (r *Repository) FindTransactionByHash(hash string) (*models.Transaction, error) {
+	trx := new(models.Transaction)
+	err := r.db.Model(trx).Column("id", "from_address_id").Where("hash = ?", hash).Select(trx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return tx.ID, nil
+	return trx, nil
 }
+
+func (r *Repository) SelectCoinsTransaction() (*[]models.Transaction, error) {
+	var transactions []models.Transaction
+	_, err := r.db.Query(&transactions, `
+		SELECT t.id, t.from_address_id, t.data
+			FROM public.transactions as t
+			where t.type=? and t.id not in
+			(select c.creation_transaction_id from public.coins as c
+				where c.creation_transaction_id is not null);
+	`, models.TxTypeCreateCoin)
+	if err != nil {
+		return nil, err
+	}
+	return &transactions, nil
+}
+

@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/noah-blockchain/CoinExplorer-Extender/address"
-	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
-	"github.com/noah-blockchain/CoinExplorer-Extender/utils"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/address"
+	"github.com/noah-blockchain/noah-extender/internal/coin"
+	"github.com/noah-blockchain/noah-extender/internal/utils"
 	"github.com/noah-blockchain/noah-node-go-api"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/pkg/errors"
@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	precision = 100
+	precision                 = 100
+	calcUptimeValidatorBlocks = 192
 )
 
 type Service struct {
@@ -148,7 +149,7 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 		}
 
 		if resp.Error != nil {
-			s.logger.Errorf("UpdateStakesWorker error: message=%s and data=%s", resp.Error.Message, resp.Error.Data) // todo
+			//s.logger.Errorf("UpdateStakesWorker error: message=%s and data=%s", resp.Error.Message, resp.Error.Data) // todo
 			continue
 		}
 
@@ -276,24 +277,9 @@ func (s *Service) UpdateStakesWorker(jobs <-chan uint64) {
 			s.logger.Error(errors.WithStack(err))
 		}
 
-		if height%192 == 0 { //update uptime
-			_ = s.Repository.ResetAllUptimes()
+		if height%calcUptimeValidatorBlocks == 0 { //update uptime
 			for _, validatorID := range validatorIds {
-				go func(validatorID uint64) {
-					signedCount, err := s.Repository.GetFullSignedCountValidatorBlock(validatorID)
-					if err != nil {
-						s.logger.Error(errors.WithStack(err))
-						return
-					}
-
-					value := float64(signedCount)/float64(height)
-					var uptime = math.Min(value * 100, 100.0)
-					if err = s.Repository.UpdateValidatorUptime(validatorID, uptime); err != nil {
-						s.logger.Error(errors.WithStack(err))
-						return
-					}
-				}(validatorID)
-
+				// calc count validators
 				go func(validatorID uint64) {
 					countDelegators, err := s.Repository.GetCountDelegators(validatorID)
 					if err != nil {

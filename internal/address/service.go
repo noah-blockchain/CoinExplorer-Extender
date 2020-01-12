@@ -3,15 +3,16 @@ package address
 import (
 	"encoding/base64"
 	"errors"
+	"math"
+	"strconv"
+	"sync"
+
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
 	"github.com/noah-blockchain/noah-go-node/core/check"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
-	"math"
-	"strconv"
-	"sync"
 )
 
 type Service struct {
@@ -171,7 +172,6 @@ func (s *Service) FindId(address string) (uint64, error) {
 	}
 	return addrID, nil
 }
-
 
 func addressesMapToSlice(mapAddresses map[string]struct{}) []string {
 	addresses := make([]string, len(mapAddresses))

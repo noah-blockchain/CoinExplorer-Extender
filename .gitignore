@@ -149,11 +149,6 @@ Icon
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
 
-cmd/update_prices
-cmd/update_capitalization
-cmd/update_created_at
-cmd/update_start_fields
-
 # Directories potentially created on remote AFP share
 .AppleDB
 .AppleDesktop
@@ -163,7 +158,7 @@ Temporary Items
 
 # End of https://www.gitignore.io/api/go,linux,macos,jetbrains
 build
-builds
 go.sum
 
 db
+cmd/uptime-test

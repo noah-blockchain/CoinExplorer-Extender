@@ -111,15 +111,6 @@ func (r Repository) DeleteBySymbol(symbol string) error {
 	return err
 }
 
-func (r *Repository) UpdateCoinOwner(symbol string, creationAddressID uint64) error {
-	coin := models.Coin{CreationAddressID: &creationAddressID}
-	_, err := r.db.Model(&coin).Column("creation_address_id").Where("symbol = ?", symbol).Update()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (r *Repository) UpdateCoinDelegation(id uint64, delegated uint64) error {
 	coin := models.Coin{Delegated: delegated}
 	_, err := r.db.Model(&coin).Column("delegated").Where("id = ?", id).Update()
@@ -137,11 +128,24 @@ func (r Repository) ResetCoinDelegationNotInListIds(idList []uint64) error {
 	return nil
 }
 
-func (r *Repository) UpdateCoinTransaction(symbol string, creationTransactionID uint64) error {
-	coin := models.Coin{CreationTransactionID: &creationTransactionID}
-	_, err := r.db.Model(&coin).Column("creation_transaction_id").Where("symbol = ?", symbol).Update()
+func (r *Repository) UpdateCoinMetaInfo(symbol string, trxId, ownerAddrId uint64) error {
+	coin := models.Coin{CreationTransactionID: &trxId, CreationAddressID: &ownerAddrId}
+	_, err := r.db.Model(&coin).
+		Column("creation_transaction_id", "creation_address_id").
+		Where("symbol = ?", symbol).Update()
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (r *Repository) SelectCoinsWithBrokenMeta() (*[]models.Coin, error) {
+	var coins []models.Coin
+	err := r.db.Model(&coins).Column("symbol").
+		Where("creation_transaction_id IS NULL").
+		Where("id > ?", 1).Select()
+	if err != nil {
+		return nil, err
+	}
+	return &coins, nil
 }

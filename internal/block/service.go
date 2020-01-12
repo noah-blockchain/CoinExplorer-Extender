@@ -1,13 +1,14 @@
 package block
 
 import (
-	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
-	"github.com/noah-blockchain/coinExplorer-tools/helpers"
-	"github.com/noah-blockchain/coinExplorer-tools/models"
-	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"math"
 	"strconv"
 	"time"
+
+	"github.com/noah-blockchain/coinExplorer-tools/helpers"
+	"github.com/noah-blockchain/coinExplorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/validator"
+	"github.com/noah-blockchain/noah-node-go-api/responses"
 )
 
 type Service struct {

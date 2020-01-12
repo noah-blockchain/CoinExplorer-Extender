@@ -3,7 +3,7 @@ package coin
 import (
 	"math/big"
 
-	"github.com/noah-blockchain/CoinExplorer-Extender/utils"
+	"github.com/noah-blockchain/noah-extender/internal/utils"
 	"github.com/noah-blockchain/noah-go-node/core/types"
 	"github.com/noah-blockchain/noah-go-node/math"
 )

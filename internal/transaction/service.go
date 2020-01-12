@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/noah-blockchain/CoinExplorer-Extender/address"
-	"github.com/noah-blockchain/CoinExplorer-Extender/coin"
-	"github.com/noah-blockchain/CoinExplorer-Extender/validator"
 	"github.com/noah-blockchain/coinExplorer-tools/helpers"
 	"github.com/noah-blockchain/coinExplorer-tools/models"
 	node_models "github.com/noah-blockchain/noah-explorer-tools/models"
+	"github.com/noah-blockchain/noah-extender/internal/address"
+	"github.com/noah-blockchain/noah-extender/internal/coin"
+	"github.com/noah-blockchain/noah-extender/internal/validator"
 	"github.com/noah-blockchain/noah-go-node/core/check"
 	"github.com/noah-blockchain/noah-node-go-api/responses"
 	"github.com/sirupsen/logrus"
@@ -367,10 +367,18 @@ func (s *Service) getLinksTxValidator(transactions []*models.Transaction) ([]*mo
 	return links, nil
 }
 
-func (s *Service) FindTransactionIdByHash(hash string) (uint64, error) {
-	trxID, err := s.txRepository.FindTransactionIdByHash(hash)
+func (s *Service) FindTransactionByHash(hash string) (*models.Transaction, error) {
+	trx, err := s.txRepository.FindTransactionByHash(hash)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return trxID, nil
+	return trx, nil
+}
+
+func (s *Service) SelectCoinsTransaction() (*[]models.Transaction, error) {
+	transactions, err := s.txRepository.SelectCoinsTransaction()
+	if err != nil || transactions == nil {
+		return nil, err
+	}
+	return transactions, nil
 }
