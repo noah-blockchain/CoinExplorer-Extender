@@ -117,11 +117,6 @@ func (s *Service) UpdateBalancesWorker(jobs <-chan AddressesBalancesContainer) {
 func (s *Service) HandleBalanceResponse(response *responses.BalancesResponse) ([]*models.Balance, error) {
 	var balances []*models.Balance
 
-	if len(response.Result) == 0 {
-		s.logger.Warn("No data in response")
-		return nil, nil
-	}
-
 	for _, item := range response.Result {
 		addressId, err := s.addressRepository.FindId(helpers.RemovePrefixFromAddress(item.Address))
 		if err != nil {
