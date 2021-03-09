@@ -303,6 +303,9 @@ CREATE SEQUENCE public.coins_id_seq
 ALTER SEQUENCE public.coins_id_seq OWNED BY public.coins.id;
 
 
+INSERT INTO public.coins (id, name, symbol, created_at, updated_at)
+VALUES (1, 'NOAH', 'NOAH', now(), now());
+
 --
 -- Name: invalid_transactions; Type: TABLE; Schema: public; Owner: noah
 --
@@ -1518,8 +1521,5 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON SCHEMA public FROM noah;
 GRANT ALL ON SCHEMA public TO noah;
 GRANT ALL ON SCHEMA public TO PUBLIC;
-
-INSERT INTO public.coins (id, name, symbol, created_at, updated_at)
-VALUES (1, 'NOAH', 'NOAH', now(), now());
 
 -- REINDEX INDEX transactions_hash_index;
