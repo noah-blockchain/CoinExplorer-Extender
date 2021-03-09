@@ -1519,7 +1519,7 @@ REVOKE ALL ON SCHEMA public FROM noah;
 GRANT ALL ON SCHEMA public TO noah;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 
-INSERT INTO public.coins (symbol)
-VALUES ('NOAH');
+INSERT INTO public.coins (id, name, symbol, created_at, updated_at)
+VALUES (1, 'NOAH', 'NOAH', now(), now());
 
 -- REINDEX INDEX transactions_hash_index;
